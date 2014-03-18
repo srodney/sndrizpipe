@@ -4,7 +4,8 @@
 import exceptions
 
 def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5, 
-                makedirs=False, verbose=True, clobber=False ):
+                makedirs=False, onlyfilters=[], onlyepochs=[], 
+                checkradec=None, verbose=True, clobber=False ):
     """ 
     sort a list of flts into epochs.  Anything with MJD<mjdmin goes
     into the first epoch, anything with MJD>mjdmax goes into the last
@@ -20,6 +21,13 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
 
     if type(explist)==str : 
         explist = getExpList( explist )
+
+    if onlyfilters :
+        if type(onlyfilters)==str :
+            onlyfilters = onlyfilters.lower().split(',')
+        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
+    if type(onlyepochs) in [str,int,float]  :
+        onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
     mjdlist = np.array( [ exp.mjd for exp in explist ] )
     visitlist = np.array( [ exp.visit for exp in explist ] )
@@ -60,7 +68,15 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
                     shutil.rmtree( exp.epochdir )
 
         for exp in explist : 
-            if not os.path.isdir( exp.epochdir ): 
+            # only copy files for the given filter and epoch
+            if onlyfilters and exp.filter not in onlyfilters : 
+                continue
+            if onlyepochs and exp.epoch not in onlyepochs : 
+                continue
+            # Check that the target is on the image before copying files
+            if checkradec :
+                if not checkonimage(exp,checkradec,verbose=verbose) : continue
+            if not os.path.isdir( exp.epochdir ):
                 os.makedirs( exp.epochdir )
             if verbose : print("%s ==> %s"%(exp.filename, exp.epochdir) )
             shutil.copy( exp.filepath, exp.epochdir )
@@ -76,6 +92,25 @@ def getExpList( fltlist='*fl?.fits', outroot='TARGNAME' ):
     return( [ Exposure( fltfile, outroot=outroot ) for fltfile in fltlist ] )
 
 
+def checkonimage(exp,checkradec,verbose=True):
+    """Check if the given ra,dec falls anywhere within the
+    science frame of the image that defines the given Exposure object.
+    """
+    import pywcs
+    ra,dec = checkradec
+    onimage = False
+    for hdr in exp.headerlist :
+        expwcs = pywcs.WCS(hdr)
+        ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
+        if ix<0 or ix>expwcs.naxis1 : continue
+        if iy<0 or iy>expwcs.naxis2 : continue
+        onimage=True
+        break
+
+    if verbose and not onimage :
+        print("Target RA,Dec is off image ."%())
+    return( onimage )
+
 
 class Exposure( object ): 
     """ A class for single exposure flt.fits files, used for sorting
@@ -90,12 +125,14 @@ class Exposure( object ):
         self.filename = os.path.basename( filename )
         self.filepath = os.path.abspath( filename )
 
-        try: 
-            h=pyfits.getheader( self.filepath )
-        except exceptions.Exception as e: 
-            raise exceptions.RuntimeError("Unable to open file %s."%filepath)
+        self.header = pyfits.getheader( self.filepath )
+        hdulist = pyfits.open(self.filepath)
+        self.headerlist = []
+        for hdu in hdulist :
+            if hdu.name!='SCI':continue
+            self.headerlist.append( hdu.header )
 
-        if outroot=='TARGNAME' : outroot = h['TARGNAME']
+        if outroot=='TARGNAME' : outroot = self.header['TARGNAME']
         self.outroot = outroot
 
         if 'flt.fits' in self.filename : 
@@ -105,41 +142,41 @@ class Exposure( object ):
             self.fltsuffix = 'flc'
             self.drzsuffix = 'drc'
 
-        self.mjd = round( h['EXPSTART'], 2 )
+        self.mjd = round( self.header['EXPSTART'], 2 )
         try : 
-            filtername = h['FILTER']
+            filtername = self.header['FILTER']
         except : 
-            filtername = h['FILTER1']
+            filtername = self.header['FILTER1']
             if filtername.startswith('CLEAR') : 
-                filtername = h['FILTER2']
+                filtername = self.header['FILTER2']
         self.filtername = filtername[:5].lower()
         self.filter = self.filtername
 
-        self.camera = h['INSTRUME']+'-'+h['DETECTOR']
+        self.camera = self.header['INSTRUME']+'-'+self.header['DETECTOR']
 
-        self.pid = h['PROPOSID']
-        self.linenum = h['LINENUM']
-        self.target = h['TARGNAME']
+        self.pid = self.header['PROPOSID']
+        self.linenum = self.header['LINENUM']
+        self.target = self.header['TARGNAME']
 
         # Visit name and exposure number (in the orbit sequence), 
         # as defined in APT
         self.visit = self.linenum.split('.')[0]
         self.expnum = int( self.linenum.split('.')[1] )
 
-        if h['PATTERN1'] == 'NONE' :
+        if self.header['PATTERN1'] == 'NONE' :
             self.dither = ceil( self.expnum / 2. )
         else : 
-            self.dither = h['PATTSTEP']
+            self.dither = self.header['PATTSTEP']
 
         self.crsplit = 0
-        if 'CRSPLIT' in h.keys(): 
-            if h['CRSPLIT'] == 2 :
-                if h['SHUTRPOS'] == 'A' : 
+        if 'CRSPLIT' in self.header.keys():
+            if self.header['CRSPLIT'] == 2 :
+                if self.header['SHUTRPOS'] == 'A' :
                     self.crsplit = 1
-                elif h['SHUTRPOS'] == 'B' : 
+                elif self.header['SHUTRPOS'] == 'B' :
                     self.crsplit = 2
 
-        self.rootname = h['ROOTNAME']
+        self.rootname = self.header['ROOTNAME']
 
 
         # 2-digits uniquely identifying this visit and this exposure

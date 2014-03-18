@@ -71,7 +71,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     if onlyfilters : 
         if type(onlyfilters)==str : 
             onlyfilters = onlyfilters.lower().split(',')
-        onlyfilters = [ filt[:5] for filt in onlyfilters ]
+        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
     if type(onlyepochs) in [str,int,float]  : 
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
@@ -81,7 +81,9 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
         exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir)
     explist = sort.getExpList( fltlist, outroot=outroot )
     explist, epochlist = sort.intoEpochs( explist, mjdmin=mjdmin, mjdmax=mjdmax, epochspan=epochspan, 
-                                          makedirs=dosort, verbose=verbose, clobber=clobber )
+                                          makedirs=dosort, checkradec=[ra,dec], 
+                                          onlyfilters=onlyfilters, onlyepochs=onlyepochs,
+                                          verbose=verbose, clobber=clobber )
     FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )     
     FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )     
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
@@ -334,36 +336,4 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 os.chdir( topdir )
     
 
-
-if __name__ == '__main__':
-
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Run astrodrizzle on a set of flt or flc images.')
-    parser.add_argument('outroot', metavar='outroot',help='Root name for the output _drz products.')
-    parser.add_argument('fltlist', metavar='fltlist',nargs = '?',help='List of input flt/flc.fits files. Wildcards are allowed (e.g. "*fl?.fits").', default="*fl?.fits")
-    parser.add_argument('--refimage', metavar='refimage', help='WCS reference image. The flt files will be registered to this image. Full path is required.',default='')
-    parser.add_argument('--ra', metavar='ra', type=float, help='R.A. for center of output image (in lieu of a refimage)', default=None)
-    parser.add_argument('--dec', metavar='dec', type=float, help='Decl. for center of output image (in lieu of a refimage)', default=None)
-    parser.add_argument('--rot', metavar='rot', type=float, help='Rotation (deg E of N) for output image (in lieu of a refimage)', default=0.0)
-    parser.add_argument('--imsize', metavar='imsize', type=float, help='Image size [arcsec] of output image (in lieu of a refimage)', default=None)
-    parser.add_argument('--pixscale', metavar='pixscale', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
-    parser.add_argument('--pixfrac', metavar='pixfrac', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    parser.add_argument('--wht_type', metavar='wht_type', type=str, help='Type of the weight image.', default='ERR')
-
-    # parser.add_argument('--refdir', metavar='refdir', help='Directory containing HST reference files. The final slash is required.', default='./')
-
-    # parser.add_argument('--drizcr', action='store_true', help='Run the CR rejection stage in astrodrizzle.', default=False)
-
-    parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
-    parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]')
-    parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]')
-    parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
-
-    args = parser.parse_args()
-
-    runastrodrizzle( args.outroot, args.fltlist, refimage=args.refimage, 
-                     ra=args.ra, dec=args.dec, rot=args.rot, imsize_arcsec=args.imsize, 
-                     pixscale=args.pixscale, pixfrac=args.pixfrac, wht_type=args.wht_type,
-                     clobber=args.clobber, verbose=args.verbose, debug=args.debug  )
 
