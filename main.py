@@ -177,6 +177,12 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     if doreg or dodrizepoch : 
         if not (os.path.islink( refimSymlink ) and os.path.isfile( os.path.realpath( refimSymlink ) )):
             raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
+        elif not refim and os.path.islink( refimSymlink ) : 
+            refim = os.path.realpath( refimSymlink )
+        elif not refim : 
+            raise exceptions.RuntimeError("No refim file defined! Can't register without a refim.")
+        else : 
+            refim = os.path.abspath( refim )
 
         # Fix the output  ra and dec center point if not provided by the user. 
         if not ra and not dec : 
