@@ -3,8 +3,7 @@
 
 import os
 import pyfits
-import numpy
-import exceptions
+# import exceptions
 
 from stsci import tools
 from drizzlepac import tweakreg, astrodrizzle
@@ -15,7 +14,8 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZZLE', 
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  peakmin=None, peakmax=None, threshold=4.0,
-                 fitgeometry='rscale', interactive=False, debug=False ):
+                 fitgeometry='rscale',
+                 interactive=False, clobber=False, debug=False ):
     if debug : import pdb; pdb.set_trace()
 
     #convert the input list into a useable list of images for astrodrizzle
@@ -40,7 +40,16 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
         conv_width = 2.5
     else : 
         conv_width = 2.5
-    
+
+    # check first if the WCS wcsname already exists in the first flt image
+    wcsnamelist = [ hdr1[k] for k in hdr1.keys() if k.startswith('WCSNAME') ]
+    if wcsname in wcsnamelist and not clobber :
+        print(
+            "WCSNAME %s already exists in %s"%(wcsname,fltlist[0]) +
+            "so I'm skipping over this tweakreg step." +
+            "Re-run with clobber=True if you really want it done." )
+        return( wcsname )
+
     if interactive : 
         while True : 
             print( "sndrizzle.register:  Running a tweakreg loop interactively.")
@@ -99,37 +108,9 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
     return( wcsname )
 
 
-def toCatalog( filelist, refcat, refim,
-               rfluxmax=27, rfluxmin=18, searchrad=1.0,
-               peakmin=None, peakmax=None, threshold=4.0,
-               interactive=False, debug=False ):
-    """ 
-    Run tweakreg on a list of flt images to bring them 
-    into alignment with the given reference catalog, refcat.
-
-    refcat should be a sextractor-style catalog, containing columns
-    with source positions in decimal degrees, labeled 'RA' and 'DEC'.
-
-    When interactive is True, the user will be presented with the
-    tweakreg plots (2d histogram, residuals, etc) to review, and will
-    be given the opportunity to adjust the tweakreg parameters and
-    re-run.
-    """
-    if debug : import pdb; pdb.set_trace() 
-    
-    # TODO : 
-    #  read in the catalog header with astropy
-    #  determine which columns have ra, dec, and mag values
-
-    wcsname = RunTweakReg( filelist, refim=refim, refcat=refcat, wcsname='REFCAT:%s'%os.path.basename(refcat),
-                           rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
-                           peakmin=peakmin, peakmax=peakmax, threshold=threshold, 
-                           interactive=interactive, debug=debug )
-    return( wcsname )
-
 
 def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
-                interactive=False, debug=False ):
+                interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images belonging to the same visit, 
     updating their WCS for alignment with the WCS of the first in the list. 
@@ -140,15 +121,16 @@ def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
     re-run.
     """
     if debug : import pdb; pdb.set_trace() 
-    wcsname = RunTweakReg( fltlist, refcat=None, wcsname='INTRAVIS',
-                           searchrad=1.0, peakmin=peakmin, peakmax=peakmax, 
-                           fitgeometry='shift', threshold=threshold, interactive=interactive,  )
+    wcsname = RunTweakReg(
+        fltlist, refcat=None, wcsname='INTRAVIS', searchrad=1.0,
+        peakmin=peakmin, peakmax=peakmax, fitgeometry='shift',
+        threshold=threshold, interactive=interactive,  clobber=clobber )
     return( wcsname )
 
 
 def toFirstim( fltlist, searchrad=1.0,
                peakmin=None, peakmax=None, threshold=4.0,
-               interactive=False, debug=False ):
+               interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images, updating their WCS for
     alignment with the WCS of the first file in the list.
@@ -160,9 +142,11 @@ def toFirstim( fltlist, searchrad=1.0,
     """
     if debug : import pdb; pdb.set_trace() 
     firstimfile = os.path.basename(fltlist[0])
-    wcsname = RunTweakReg( fltlist, refcat=None, wcsname='FIRSTIM:%s'%firstimfile,
-                           searchrad=searchrad, peakmin=peakmin, peakmax=peakmax, 
-                           threshold=threshold, interactive=interactive, debug=debug )
+    wcsname = RunTweakReg(
+        fltlist, refcat=None, wcsname='FIRSTIM:%s'%firstimfile,
+        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
+        threshold=threshold, interactive=interactive,
+        clobber=clobber, debug=debug )
     return( wcsname )
 
 
@@ -170,7 +154,7 @@ def toFirstim( fltlist, searchrad=1.0,
 def toRefim( filelist, refim, refcat=None,
              rfluxmax=27, rfluxmin=18, searchrad=1.0,
              peakmin=None, peakmax=None, threshold=4.0,
-             interactive=False, debug=False ):
+             interactive=False, clobber=False, debug=False ):
     """Run tweakreg on a list of flt or drz images to bring them into
     alignment with the given reference image, refim.  Optionally a
     refcat can be provided to define the absolute astrometric system
@@ -188,10 +172,12 @@ def toRefim( filelist, refim, refcat=None,
     """
     if debug : import pdb; pdb.set_trace()
     
-    wcsname = RunTweakReg( filelist, refim=refim, refcat=refcat, wcsname='REFIM:%s'%os.path.basename(refim),
-                           rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
-                           peakmin=peakmin, peakmax=peakmax, threshold=threshold, 
-                           interactive=interactive, debug=debug )
+    wcsname = RunTweakReg(
+        filelist, refim=refim, refcat=refcat,
+        wcsname='REFIM:%s'%os.path.basename(refim),
+        rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
+        peakmin=peakmin, peakmax=peakmax, threshold=threshold,
+        interactive=interactive, clobber=clobber, debug=debug )
     return( wcsname )
 
 
@@ -217,14 +203,14 @@ def printfloat( fmtstr, value ):
     """ Print a float value using the given format string, handling
     None and NaN values appropriately
     """
-    try : 
+    try :
         print( fmtstr % value ) 
     except : 
         pct = fmtstr.find('%')
         f = pct + fmtstr[pct:].find('f') + 1
         if value == None : 
             print( fmtstr[:pct] + ' None ' + fmtstr[f:] )
-        elif value == nan : 
+        elif value == float('nan') :
             print( fmtstr[:pct] + ' NaN ' + fmtstr[f:] )
         else : 
             print( fmtstr[:pct] + ' ??? ' + fmtstr[f:] )

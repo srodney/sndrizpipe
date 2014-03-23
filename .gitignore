@@ -2,6 +2,7 @@
 .idea
 *~
 \#*\#
+commit.txt
 
 # C extensions
 *.so

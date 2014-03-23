@@ -226,9 +226,11 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
 
             # register to the ref image and ref catalog
             origwcs = pyfits.getval( outsciFEV,'WCSNAME').strip()
-            wcsname = register.toRefim( outsciFEV, refim=refimpath, refcat=refcatpath,  
-                                        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax, threshold=threshold,
-                                        interactive=interactive, debug=debug )
+            wcsname = register.toRefim(
+                outsciFEV, refim=refimpath, refcat=refcatpath,
+                searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
+                threshold=threshold,
+                interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
             tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs, wcsname=wcsname, verbose=verbose, force=clobber )

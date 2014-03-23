@@ -33,7 +33,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     # define the default astrodrizzle parameters for this camera
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
-    drizpar = getdrizpar( instrument, detector) 
+    drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
     astrodrizzle.AstroDrizzle( 
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False, resetbits=int(driz_cr and 4096),
@@ -115,24 +115,42 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
 
 
 
-
-def getdrizpar( instrument, detector ) : 
+def getdrizpar( instrument, detector, nexposures=None ) :
     """
     return a dict with defaults for a few key astrodrizzle parameters,
     based on the instrument and detector 
 
     # TODO : adjust parameters based on number of dithers
     """
-    if instrument=='WFC3': 
+    if nexposures is None :
+        nexposures = 2 # set a middle-of-the-road pixscale as the default
+
+    if instrument=='WFC3':
         if detector.startswith('IR'): 
-            return( {'pixscale':0.06, 'pixfrac':1.0, 'imsize_arcsec':200,
+            if nexposures == 1 :
+                pixscale=0.13
+            elif nexposures == 2 :
+                pixscale=0.09
+            elif nexposures >= 3 :
+                pixscale=0.06
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':200,
                      'drizbits':'8192,512,64'} )
         elif detector.startswith('UV'):
-            return( {'pixscale':0.05, 'pixfrac':1.0, 'imsize_arcsec':230, 
+            if nexposures == 1 :
+                pixscale=0.04
+            elif nexposures >= 2 :
+                pixscale=0.03
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':230,
                      'drizbits':'64,32' } )
     elif instrument=='ACS': 
-        if detector.startswith('WFC'): 
-            return( {'pixscale':0.03, 'pixfrac':1.0, 'imsize_arcsec':300,
+        if detector.startswith('WFC'):
+            if nexposures == 1 :
+                pixscale=0.05
+            elif nexposures == 2 :
+                pixscale=0.04
+            elif nexposures >= 3 :
+                pixscale=0.03
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':300,
                      'drizbits':'64,32'} )
     else :
         raise exceptions.RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )
@@ -143,6 +161,7 @@ def scrubnans( filename, fillval=0 ):
     indef, or inf. Replace them all with the given fillval.
     """
     from numpy import where, isfinite
+
     hdulist = pyfits.open( filename, mode='update' )
     imdata = hdulist[0].data
     ybad, xbad  = where( 1-isfinite( imdata ) )
@@ -178,8 +197,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    runastrodrizzle( args.outroot, args.fltlist, refimage=args.refimage, 
-                     ra=args.ra, dec=args.dec, rot=args.rot, imsize_arcsec=args.imsize, 
-                     pixscale=args.pixscale, pixfrac=args.pixfrac, wht_type=args.wht_type,
-                     clobber=args.clobber, verbose=args.verbose, debug=args.debug  )
+    # TODO : insert firstdrizzle or seconddrizzle function calls here
 
