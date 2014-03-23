@@ -36,7 +36,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     drizpar = getdrizpar( instrument, detector) 
     astrodrizzle.AstroDrizzle( 
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
-        updatewcs=False, wcskey=wcskey, build=False, 
+        updatewcs=False, wcskey=wcskey, build=False, resetbits=int(driz_cr and 4096),
         restore=True, preserve=True, overwrite=False, clean=True, 
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
@@ -90,7 +90,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
 
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle( 
-        fltlist, output=outroot, updatewcs=False, 
+        fltlist, output=outroot, updatewcs=False, resetbits=0,
         restore=False, preserve=True, overwrite=True, clean=True, 
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale, 
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
