@@ -344,7 +344,8 @@ def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
             # now do the subtractions
             tempdir = outroot+'.e%02i'%tempepoch
             tempsci = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
-            tempbpx = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_bpx.fits'%(outroot,filter,tempepoch,drzsuffix))
+            tempwht = tempsci.replace('sci.fits','wht.fits')
+            tempbpx = tempsci.replace('sci.fits','bpx.fits')
             topdir = os.path.abspath( '.' )
             for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
@@ -355,6 +356,7 @@ def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
                 outrootFE =  "%s_%s"%(outroot,explistFE[0].FEgroup)
                 drzsuffix = explistFE[0].drzsuffix
                 thisregsci = "%s_reg_%s_sci.fits"%(outrootFE,drzsuffix)
+                thisregwht = "%s_reg_%s_wht.fits"%(outrootFE,drzsuffix)
                 thisregbpx = "%s_reg_%s_bpx.fits"%(outrootFE,drzsuffix)
                 
                 os.chdir( epochdirFE )
@@ -372,8 +374,16 @@ def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
 
                 diffim = imarith.imsubtract( tempsci, thisregsci, outfile=thisdiffim,
                                               clobber=clobber, verbose=verbose, debug=debug)
-                diffimMasked = badpix.applyUnionMask( diffim, tempbpx, thisregbpx )
-                print("Created diff image %s"%diffimMasked )
+                diffwht = badpix.combine_ivm_maps( thisregwht, tempwht,
+                                                   diffim.replace('sci.fits','wht.fits'),
+                                                   clobber=clobber, verbose=verbose )
+                diffbpx = badpix.unionmask( tempbpx, thisregbpx,
+                                     diffim.replace('sci.fits','bpx.fits'),
+                                     clobber=clobber, verbose=verbose)
+                diffim_masked = badpix.applymask( diffim, diffbpx,
+                                                 clobber=clobber, verbose=verbose)
+                print("Created diff image %s, wht map %s, and bpx mask %s"%(
+                    diffim_masked, diffwht, diffbpx ) )
                 os.chdir( topdir )
     return 0
 
