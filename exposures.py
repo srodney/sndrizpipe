@@ -1,7 +1,8 @@
 # S.Rodney 2014.03.04
-# Sorting flt files into epochs by date and filter
-# for registration and drizzling
-import exceptions
+# Reading exposure info from a pile of flt files,
+# defining epochs by date and filter, and moving
+# flt files into epoch subdirs for registration
+# and drizzling.
 
 def get_explist( fltlist='*fl?.fits', outroot='TARGNAME' ):
     """ make a list of Exposure objects for each flt file"""
@@ -100,8 +101,8 @@ def print_epochs( explist, outfile=None, clobber=False ):
     if outfile :
         fout.close()
 
-def into_epoch_dirs( explist,  onlyfilters=[], onlyepochs=[],
-                checkradec=None, verbose=True, clobber=False ):
+def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
+                       checkradec=None, verbose=True, clobber=False ):
     """ Given a list of Exposure objects in explist, copy the flt files into
     separate epoch directories for drizzling -- limited to the Exposures that
     match the constraints in onlyfilters and onlyepochs.

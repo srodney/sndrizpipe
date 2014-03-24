@@ -20,7 +20,7 @@ section 7.5 of the drizzlepac handbook:
 import glob
 import exceptions
 import os
-import register, sort, drizzle, badpix, imarith
+import register, exposures, drizzle, badpix, imarith
 import numpy as np
 
 def multipipe() : 
@@ -33,12 +33,12 @@ def multipipe() :
     if not len(fltdirlist) : 
         exceptions.RuntimeError( "There is no flt.<rootname> directory!")
         for fltdir in fltdirlist : 
-            pipeline( fltdir )
+            singlepipe( fltdir )
 
 
 
 # TODO : write a log file, recording user settings and results
-def pipeline( outroot, onlyfilters=[], onlyepochs=[], 
+def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
               # Run all the processing steps
               doall=False,
               # Setup : copy flts into sub-directories
@@ -92,17 +92,17 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
-    explist = sort.get_explist( fltlist, outroot=outroot )
+    explist = exposures.get_explist( fltlist, outroot=outroot )
 
     if not epochlistfile :
         epochlistfile =  "%s_epochs.txt"%explist[0].outroot
     if os.path.exists( epochlistfile ) and not clobber :
         print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        sort.read_epochs( explist, epochlistfile )
+        exposures.read_epochs( explist, epochlistfile )
     else :
-        sort.define_epochs( explist, epochspan=epochspan,
+        exposures.define_epochs( explist, epochspan=epochspan,
                             mjdmin=mjdmin, mjdmax=mjdmax )
-    sort.print_epochs( explist, outfile=epochlistfile, clobber=clobber )
+    exposures.print_epochs( explist, outfile=epochlistfile, clobber=clobber )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
@@ -118,7 +118,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     if dosetup :
         if verbose :
             print("SNDRIZZLE : (1) SETUP : copying flt files into subdirs")
-        sort.into_epoch_dirs( explist, checkradec=[ra,dec],
+        exposures.copy_to_epochdirs( explist, checkradec=[ra,dec],
                               onlyfilters=onlyfilters, onlyepochs=onlyepochs,
                               verbose=verbose, clobber=clobber )
 
@@ -162,7 +162,8 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 os.makedirs( refdrzdir )
             os.chdir( refdrzdir )
             for exp in explistRI :
-                fltfile = os.path.basename(exp.filename)
+                fltfile = os.path.basename( exp.filename )
+                refsrcdir = os.path.abspath( exp.epochdir )
                 shutil.copy( os.path.join( refsrcdir, fltfile ), fltfile )
             fltlistRI = [ exp.filename for exp in explistRI ]
             refimroot = '%s_wcsref'%outroot
@@ -339,23 +340,11 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
             else : 
                 explistF = [ exp for exp in explist if exp.filter==filter ]
                 drzsuffix = explistF[0].drzsuffix
-            # make a sym-link to the registered drz image that will
-            # serve as the template for this filter
-            tempdir = outroot+'.e%02i'%tempepoch 
-            tempsciRealpath = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
-            tempsciSymlink = '%s_%s_tmp_drz_sci.fits'%(outroot,filter) 
-            tempbpxRealpath = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_bpx.fits'%(outroot,filter,tempepoch,drzsuffix))
-            tempbpxSymlink = '%s_%s_tmp_%s_bpx.fits'%(outroot,filter,drzsuffix) 
-            if verbose : print( 'Template for %s is %s'%(filter, tempsciSymlink) )
-            for temprealpath,tempsymlink in [ [tempsciRealpath,tempsciSymlink], 
-                                               [tempbpxRealpath,tempbpxSymlink] ] :
-                if os.path.islink( tempsymlink ) and clobber : 
-                    os.remove( tempsymlink )
-                if not os.path.islink( tempsymlink ) : 
-                    os.symlink( temprealpath, tempsymlink )
-                    if verbose : print( '%s ==> %s'%(tempsymlink,temprealpath) )
 
-            # now do the subtractions 
+            # now do the subtractions
+            tempdir = outroot+'.e%02i'%tempepoch
+            tempsci = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
+            tempbpx = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_bpx.fits'%(outroot,filter,tempepoch,drzsuffix))
             topdir = os.path.abspath( '.' )
             for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
@@ -374,16 +363,16 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                     continue
                 thisdiffim = outrootFE + "-e%02i_sub_sci.fits"%tempepoch
 
-                if not os.path.isfile( tempsciRealpath ) or not os.path.isfile( thisregsci) : 
+                if not os.path.isfile( tempsci ) or not os.path.isfile( thisregsci) :
                     print( "Can't create diff image %s"%thisdiffim )
-                    print( "  missing either  %s"%tempsciRealpath )
+                    print( "  missing either  %s"%tempsci )
                     print( "    or  %s"%thisregsci )
                     os.chdir( topdir )
                     continue
 
-                diffim = imarith.imsubtract( tempsciRealpath, thisregsci, outfile=thisdiffim, 
+                diffim = imarith.imsubtract( tempsci, thisregsci, outfile=thisdiffim,
                                               clobber=clobber, verbose=verbose, debug=debug)
-                diffimMasked = badpix.applyUnionMask( diffim, tempbpxRealpath, thisregbpx )
+                diffimMasked = badpix.applyUnionMask( diffim, tempbpx, thisregbpx )
                 print("Created diff image %s"%diffimMasked )
                 os.chdir( topdir )
     return 0
@@ -455,7 +444,7 @@ def main() :
     # TODO : check that the user has provided a sufficient but non-redundant set of parameters
 
     # Run the pipeline :
-    pipeline(argv.rootname, onlyfilters=(argv.filters or []),
+    singlepipe(argv.rootname, onlyfilters=(argv.filters or []),
              onlyepochs=(argv.epochs or []),
              doall=argv.doall,
              dosetup=argv.dosetup, dorefim=argv.dorefim,
