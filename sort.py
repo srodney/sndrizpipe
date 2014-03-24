@@ -3,103 +3,49 @@
 # for registration and drizzling
 import exceptions
 
-def intoEpochs( explist, epochlistfile=None, mjdmin=0, mjdmax=0, epochspan=5,
-                makedirs=False, onlyfilters=[], onlyepochs=[], 
-                checkradec=None, verbose=True, clobber=False ):
-    """ 
-    sort a list of flts into epochs.  Anything with MJD<mjdmin goes
-    into the first epoch, anything with MJD>mjdmax goes into the last
-    epoch.  All other epochs are made of exposures taken within
-    epochspan days of eachother.
+def get_explist( fltlist='*fl?.fits', outroot='TARGNAME' ):
+    """ make a list of Exposure objects for each flt file"""
+    from stsci import tools
+    if type(fltlist)==str :
+        fltlist=tools.parseinput.parseinput(fltlist)[0]
+    return( [ Exposure( fltfile, outroot=outroot ) for fltfile in fltlist ] )
 
-    Provide epochlistfile to specify a file to write the epochs to, or else
-    this will default to <outroot>_epochs.txt using the output rootname
-    of the first exposure.  If the outfile exists and clobbering is turned
-    off, then we adopt the epoch listing in the existing epochlistfile.
 
-    Set makedirs=True to copy the flt files into separate epoch
-    directories for drizzling
+def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     """
-    import os
-    import shutil
+    Sort a list of flts into epochs.  Anything with MJD < mjdmin or
+    MJD > mjdmax goes into epoch 00 (the template epoch).
+    All other epochs are made of exposures taken within
+    epochspan days of each other.
+
+    Caution : calling this function actually updates the input explist.
+    """
     import numpy as np
 
-    if type(explist)==str : 
-        explist = getExpList( explist )
-
-    if not epochlistfile :
-        epochlistfile =  "%s_epochs.txt"%explist[0].outroot
-    if os.path.exists( epochlistfile ) and not clobber :
-        print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        explist = read_epoch_list( explist, epochlistfile )
-        epochlist = np.unique( [ exp.epoch for exp in explist ] )
-        return( explist, epochlist )
-
-    if onlyfilters :
-        if type(onlyfilters)==str :
-            onlyfilters = onlyfilters.lower().split(',')
-        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
-    if type(onlyepochs) in [str,int,float]  :
-        onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
+    if type(explist)==str :
+        explist = get_explist( explist )
 
     mjdlist = np.array( [ exp.mjd for exp in explist ] )
     visitlist = np.array( [ exp.visit for exp in explist ] )
-    filterlist = np.array( [ exp.filter for exp in explist ] )
     epochlist = np.zeros( len(mjdlist) )
 
     thisepochmjd0 = mjdlist.min()
     thisepoch = 1
-    for imjd in mjdlist.argsort() : 
+    for imjd in mjdlist.argsort() :
         thismjd = mjdlist[imjd]
         if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
         elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
-        elif thismjd > thisepochmjd0+epochspan : 
+        elif thismjd > thisepochmjd0+epochspan :
             thisepoch += 1
             thisepochmjd0 = thismjd
-        for ithisvis in np.where( visitlist == visitlist[imjd] )[0] : 
+        for ithisvis in np.where( visitlist == visitlist[imjd] )[0] :
             epochlist[ ithisvis ] = thisepoch
             explist[ ithisvis ].epoch = thisepoch
+    # Sort the exposure list by epoch, then filter, then visit
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
+    return(explist)
 
-    lastepoch = np.max( epochlist ) + 1
-    for iexp in range(len(explist)) : 
-        if explist[iexp].epoch == -1 : 
-            explist[iexp].epoch = lastepoch
-            epochlist[iexp] = lastepoch
-            
-    thisepoch = 0 
-    for iexp in epochlist.argsort() : 
-        if explist[iexp].epoch != thisepoch : 
-            thisepoch = explist[iexp].epoch
-            if verbose: print( "" )
-        if verbose: print( explist[iexp].summaryline )
-
-    if makedirs : 
-        if clobber : 
-            if verbose: print( "Wiping away existing epoch dirs.")
-            for exp in explist : 
-                if os.path.isdir( exp.epochdir ) : 
-                    shutil.rmtree( exp.epochdir )
-
-        for exp in explist : 
-            # only copy files for the given filter and epoch
-            if onlyfilters and exp.filter not in onlyfilters : 
-                continue
-            if onlyepochs and exp.epoch not in onlyepochs : 
-                continue
-            # Check that the target is on the image before copying files
-            if isinstance(checkradec,list) and len(checkradec)==2:
-                if checkradec[0] and checkradec[1] :
-                    if not checkonimage(exp,checkradec,verbose=verbose) : continue
-            if not os.path.isdir( exp.epochdir ):
-                os.makedirs( exp.epochdir )
-            if verbose : print("%s ==> %s"%(exp.filename, exp.epochdir) )
-            shutil.copy( exp.filepath, exp.epochdir )
-
-    write_epoch_list( explist, epochlistfile, clobber=clobber )
-    return( explist, np.unique(epochlist) )
-
-
-def read_epoch_list( explist, epochlistfile ):
+def read_epochs( explist, epochlistfile ):
     """Read the epoch sorting scheme from epochlistfile, apply it to
     the Exposures in explist (i.e. update their .epoch parameters) and
     return the modified explist.
@@ -113,41 +59,85 @@ def read_epoch_list( explist, epochlistfile ):
     for exp in explist :
         iexp = rootnamelist.index(exp.rootname)
         exp.epoch = epochlist[iexp]
-    return( explist )
+    # Sort the exposure list by epoch, then filter, then visit
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
+    return(explist)
 
-
-def write_epoch_list( explist, outfile, clobber=False ):
-    """Write out a text file listing the Exposures in explist, sorted into
-    epochs and grouped by visit and filter
+def print_epochs( explist, outfile=None, clobber=False ):
+    """Print summary lines for each exposure, epoch by epoch, filter by
+    filter, and visit by visit.  Everything is printed to stdout and
+    to the given outfile, if provided.
     """
     import os
-    from astropy.table import Table
 
-    if os.path.exists( outfile ) :
-        if clobber :
-            os.path.remove( outfile )
-        else :
-            print("%s exists. Not clobbering."%outfile)
-            return(outfile)
+    if outfile :
+        if os.path.exists( outfile ) :
+            if clobber :
+                os.remove( outfile )
+            else :
+                print("%s exists. Not clobbering."%outfile)
+                return(outfile)
+        fout = open( outfile, 'a' )
 
-    # TODO : Make tabledata into sorted numpy arrays for formatted output.
-    tabledata = { 'rootname':[exp.rootname for exp in explist],
-                  'epoch':[exp.epoch for exp in explist],
-                  'filter':[exp.filter for exp in explist],
-                  'visit':[exp.visit for exp in explist],
-                  'mjd':[exp.mjd for exp in explist]
-                  }
-    outtable = Table( tabledata  )
-    outtable.write( outfile, format='ascii.commented_header')
-    return( outtable )
+    # Sort the exposure list by epoch, then filter, then visit
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
 
+    header = '#%9s %5s %3s %3s %6s %5s %7s '%(
+            'rootname','pid','vis','exp','filter','epoch','mjd' )
 
-def getExpList( fltlist='*fl?.fits', outroot='TARGNAME' ):
-    """ make a list of Exposure objects for each flt file"""
-    from stsci import tools
-    if type(fltlist)==str :
-        fltlist=tools.parseinput.parseinput(fltlist)[0]
-    return( [ Exposure( fltfile, outroot=outroot ) for fltfile in fltlist ] )
+    if outfile:
+        print >> fout, header
+    print(header)
+    thisepoch = explist[0].epoch
+    for exp in explist :
+        if exp.epoch!=thisepoch:
+            print("")
+            if outfile: print>>fout,""
+            thisepoch = exp.epoch
+        if outfile:
+            print >>fout, exp.summaryline_short
+        print( exp.summaryline_short )
+    if outfile :
+        fout.close()
+
+def into_epoch_dirs( explist,  onlyfilters=[], onlyepochs=[],
+                checkradec=None, verbose=True, clobber=False ):
+    """ Given a list of Exposure objects in explist, copy the flt files into
+    separate epoch directories for drizzling -- limited to the Exposures that
+    match the constraints in onlyfilters and onlyepochs.
+    """
+    import os
+    import shutil
+
+    if onlyfilters :
+        if type(onlyfilters)==str :
+            onlyfilters = onlyfilters.lower().split(',')
+        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
+    if type(onlyepochs) in [str,int,float]  :
+        onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
+
+    if clobber :
+        if verbose:
+            print( "Wiping away existing epoch dirs.")
+        for exp in explist :
+            if os.path.isdir( exp.epochdir ) :
+                shutil.rmtree( exp.epochdir )
+
+    for exp in explist :
+        # only copy files for the given filter and epoch
+        if onlyfilters and exp.filter not in onlyfilters :
+            continue
+        if onlyepochs and exp.epoch not in onlyepochs :
+            continue
+        # Check that the target is on the image before copying files
+        if isinstance(checkradec,list) and len(checkradec)==2:
+            if checkradec[0] and checkradec[1] :
+                if not checkonimage(exp,checkradec,verbose=verbose) : continue
+        if not os.path.isdir( exp.epochdir ):
+            os.makedirs( exp.epochdir )
+        if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
+        shutil.copy( exp.filepath, exp.epochdir )
+
 
 
 def checkonimage(exp,checkradec,verbose=True):
@@ -245,13 +235,6 @@ class Exposure( object ):
         # epoch to be defined later
         self.epoch  = 99
 
-    #@property
-    #def drzsuffix( self ):
-    #    if self.camera=='ACS-WFC' : 
-    #        return( 'drc' )
-    #    else :
-    #        return( 'drz' )
-
     @property
     def epochdir( self ):
         return( '%s.e%02i'%( self.outroot, self.epoch ) )
@@ -276,9 +259,15 @@ class Exposure( object ):
         return( '%s_e%02i'%( self.filter, self.epoch ) )
            
     @property
-    def summaryline( self ) : 
+    def summaryline( self ) :
         import os
         return( '%s  PID %i  Visit %s Exp %s Filter %s : Epoch %02i MJD %.1f '%(
-                os.path.basename(self.filename), self.pid, 
-                self.visit, self.expid, self.filter, 
+                os.path.basename(self.filename), self.pid,
+                self.visit, self.expid, self.filter,
+                self.epoch, self.mjd ) )
+
+    @property
+    def summaryline_short( self ) :
+        return('%9s  %5i %3s %3s %6s    %02i %7.1f '%(
+                self.rootname, self.pid, self.visit, self.expid, self.filter,
                 self.epoch, self.mjd ) )

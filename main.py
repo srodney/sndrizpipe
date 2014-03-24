@@ -41,8 +41,10 @@ def multipipe() :
 def pipeline( outroot, onlyfilters=[], onlyepochs=[], 
               # Run all the processing steps
               doall=False,
-              # Sort flts : construct a ref image
-              dosort=False, dorefim=False,
+              # Setup : copy flts into sub-directories
+              dosetup=False, epochlistfile=None,
+              # construct a ref image
+              dorefim=False,
               # Single Visit tweakreg/drizzle pass : 
               dodriz1=False, drizcr=False, intravisitreg=False,
               # Register to a given image or  epoch, visit and filter
@@ -70,7 +72,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     fltdir = outroot + '.flt' 
 
     if doall :
-        dosort=True
+        dosetup=True
         dorefim=True
         dodriz1=True
         doreg=True
@@ -84,16 +86,28 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     if type(onlyepochs) in [str,int,float] :
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
-    # get a list of exposures and epochs, sorting flt files into epoch subdirs
+    # get a list of exposures and epochs, sorting flt files into epochs
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
-    explist = sort.getExpList( fltlist, outroot=outroot )
-    explist, epochlist = sort.intoEpochs( explist, mjdmin=mjdmin, mjdmax=mjdmax, epochspan=epochspan,
-                                          makedirs=dosort, checkradec=[ra,dec],
-                                          onlyfilters=onlyfilters, onlyepochs=onlyepochs,
-                                          verbose=verbose, clobber=clobber )
-    FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )     
+    explist = sort.get_explist( fltlist, outroot=outroot )
+
+    if not epochlistfile :
+        epochlistfile =  "%s_epochs.txt"%explist[0].outroot
+    if os.path.exists( epochlistfile ) and not clobber :
+        print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
+        sort.read_epochs( explist, epochlistfile )
+    else :
+        sort.define_epochs( explist, epochspan=epochspan,
+                            mjdmin=mjdmin, mjdmax=mjdmax )
+    sort.print_epochs( explist, outfile=epochlistfile, clobber=clobber )
+
+    if dosetup :
+        sort.into_epoch_dirs( explist, checkradec=[ra,dec],
+                              onlyfilters=onlyfilters, onlyepochs=onlyepochs,
+                              verbose=verbose, clobber=clobber )
+
+    FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )
     FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )     
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
 
@@ -127,9 +141,9 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 register.intraVisit( fltlistFEV, 
                                      peakmin=peakmin, peakmax=peakmax, threshold=threshold,
                                      interactive=interactive, debug=debug )
-            outsciFEV, outwhtFEV = drizzle.firstDrizzle( fltlistFEV, outrootFEV, 
-                                                         wcskey=((intravisitreg and 'INTRAVIS') or ''),
-                                                         driz_cr=drizcr )
+            drizzle.firstDrizzle(
+                fltlistFEV, outrootFEV, driz_cr=drizcr,
+                wcskey=((intravisitreg and 'INTRAVIS') or '') )
             os.chdir( topdir )
 
     # STAGE 2 : 
@@ -141,7 +155,9 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
         if not refim : 
             # No refimage has been specified, so use
             # the first FEVgroup to construct one
-            if not refepoch : refepoch = np.min( epochlist ) 
+            if not refepoch :
+                epochlist = [ exp.epoch for exp in explist ]
+                refepoch = np.min( epochlist )
             if not reffilter :
                 reffilter = sorted( [ exp.filter for exp in explist
                                       if exp.epoch==refepoch ] )[0]
@@ -206,7 +222,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
             dec = pyfits.getval( refim, "CRVAL2" )    
 
 
-        # Update the WCS of the refim so that it matches the reference catalog
+        # TODO : Update the WCS of the refim so that it matches the reference catalog
         #if refcat : 
         #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
         #    register.toCatalog( refim, refcat, refim, rfluxmax=rfluxmax, rfluxmin=rfluxmin, 
@@ -382,7 +398,7 @@ def mkparser():
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
 
     proc = parser.add_argument_group("Processing stages")
-    proc.add_argument('--dosort', action='store_true', help='(1) sort flt files into epochs', default=False)
+    proc.add_argument('--dosetup', action='store_true', help='(1) copy flt files into epoch subdirs', default=False)
     proc.add_argument('--dorefim', action='store_true', help='(2) build the WCS ref image', default=False)
     proc.add_argument('--dodriz1', action='store_true', help='(3) first astrodrizzle pass (single visit)', default=False)
     proc.add_argument('--doreg', action='store_true', help='(4) run tweakreg to align with refimage', default=False)
@@ -434,7 +450,7 @@ def main() :
     pipeline(argv.rootname, onlyfilters=(argv.filters or []),
              onlyepochs=(argv.epochs or []),
              doall=argv.doall,
-             dosort=argv.dosort, dorefim=argv.dorefim,
+             dosetup=argv.dosetup, dorefim=argv.dorefim,
              dodriz1=argv.dodriz1, doreg=argv.doreg,
              dodriz2=argv.dodriz2, dodiff=argv.dodiff,
              drizcr=argv.drizcr, intravisitreg=argv.intravisitreg,
