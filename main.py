@@ -19,7 +19,6 @@ section 7.5 of the drizzlepac handbook:
 
 import glob
 import exceptions
-import shutil
 import os
 import register, sort, drizzle, badpix, imarith
 import numpy as np
@@ -40,16 +39,18 @@ def multipipe() :
 
 # TODO : write a log file, recording user settings and results
 def pipeline( outroot, onlyfilters=[], onlyepochs=[], 
+              # Run all the processing steps
+              doall=False,
               # Sort flts : construct a ref image
-              dosort=True, dorefim=True,
+              dosort=False, dorefim=False,
               # Single Visit tweakreg/drizzle pass : 
-              dodrizvisit=True, drizcr=True, intravisitreg=False, 
+              dodriz1=False, drizcr=False, intravisitreg=False,
               # Register to a given image or  epoch, visit and filter
               doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
               # Drizzle registered flts by epoch and filter 
-              dodrizepoch=False, 
+              dodriz2=False,
               # make diff images
-              dodiff=True, tempepoch=None,
+              dodiff=False, tempepoch=0,
               refcat=None,
               interactive=False, threshold=4, peakmin=None, peakmax=None,
               rfluxmax=27, rfluxmin=14, searchrad=1.5,
@@ -68,20 +69,28 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     topdir = os.path.abspath( '.' )
     fltdir = outroot + '.flt' 
 
+    if doall :
+        dosort=True
+        dorefim=True
+        dodriz1=True
+        doreg=True
+        dodriz2=True
+        dodiff=True
+
     if onlyfilters : 
         if type(onlyfilters)==str : 
             onlyfilters = onlyfilters.lower().split(',')
         onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
-    if type(onlyepochs) in [str,int,float]  : 
+    if type(onlyepochs) in [str,int,float] :
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
     # get a list of exposures and epochs, sorting flt files into epoch subdirs
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
-        exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir)
+        raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
     explist = sort.getExpList( fltlist, outroot=outroot )
-    explist, epochlist = sort.intoEpochs( explist, mjdmin=mjdmin, mjdmax=mjdmax, epochspan=epochspan, 
-                                          makedirs=dosort, checkradec=[ra,dec], 
+    explist, epochlist = sort.intoEpochs( explist, mjdmin=mjdmin, mjdmax=mjdmax, epochspan=epochspan,
+                                          makedirs=dosort, checkradec=[ra,dec],
                                           onlyfilters=onlyfilters, onlyepochs=onlyepochs,
                                           verbose=verbose, clobber=clobber )
     FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )     
@@ -93,7 +102,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     # filter), using almost-default parameters, doing CR rejection
     # and applying intravisit registrations if requested.  The output
     # is a drz_sci.fits file in the native rotation.
-    if dodrizvisit : 
+    if dodriz1 :
         for FEVgroup in FEVgrouplist : 
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
@@ -126,15 +135,21 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     # STAGE 2 : 
     # Define the epoch, visit and filter for the reference image and 
     # construct it if needed.
-    if dorefim or dodrizvisit or dodrizepoch : 
+    if dorefim or dodriz1 or dodriz2 :
         if refim and not os.path.exists( refim ) : 
             raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
         if not refim : 
-            # No refimage has been specified, so use the first FEVgroup to construct one
+            # No refimage has been specified, so use
+            # the first FEVgroup to construct one
             if not refepoch : refepoch = np.min( epochlist ) 
-            if not reffilter : reffilter = sorted( [ exp.filter for exp in explist if exp.epoch==refepoch ] )[0]
-            if not refvisit : refvisit = sorted( [ exp.visit for exp in explist if exp.epoch==refepoch and exp.filter==reffilter ] )[0]
+            if not reffilter :
+                reffilter = sorted( [ exp.filter for exp in explist
+                                      if exp.epoch==refepoch ] )[0]
             reffilter = reffilter.lower()
+            if not refvisit :
+                refvisit = sorted( [ exp.visit for exp in explist
+                                     if exp.epoch==refepoch and
+                                        exp.filter==reffilter.lower() ] )[0]
             refvisit = refvisit.upper()
             refimroot = '%s_%s_e%02i_v%s_ref'%(outroot,reffilter, refepoch, refvisit)
             explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch 
@@ -154,10 +169,11 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
             refepochdir = explistRI[0].epochdir
             fltlistRI = [ exp.filename for exp in explistRI ]
             os.chdir( refepochdir )
-            refimsci, refimwht = drizzle.secondDrizzle( fltlistRI, refimroot, refimage=None, 
-                                                        ra=ra, dec=dec, rot=rot, imsize_arcsec=imsize_arcsec, 
-                                                        pixscale=pixscale, pixfrac=pixfrac, 
-                                                        clobber=clobber, verbose=verbose, debug=debug  )
+            refimsci, refimwht = drizzle.secondDrizzle(
+                fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
+                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                pixscale=pixscale, pixfrac=pixfrac,
+                clobber=clobber, verbose=verbose, debug=debug  )
             refim = os.path.abspath( refimsci )
             os.chdir(topdir)
 
@@ -174,7 +190,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
 
 
 
-    if doreg or dodrizepoch : 
+    if doreg or dodriz2 :
         if not (os.path.islink( refimSymlink ) and os.path.isfile( os.path.realpath( refimSymlink ) )):
             raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
         elif not refim and os.path.islink( refimSymlink ) : 
@@ -233,7 +249,8 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
-            tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs, wcsname=wcsname, verbose=verbose, force=clobber )
+            tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs,
+                       wcsname=wcsname, verbose=verbose, force=clobber )
             os.chdir(topdir)
               
 
@@ -241,7 +258,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     # Second and final astrodrizzle pass, wherein we rerun
     # astrodrizzle to get wcs- and pixel-registered drz images
     # combining all flt files with the same filter and epoch.
-    if dodrizepoch : 
+    if dodriz2 :
         for FEgroup in FEgrouplist : 
             explistFE = [ exp for exp in explist if exp.FEgroup == FEgroup ]
             thisepoch = explistFE[0].epoch
@@ -263,13 +280,15 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 os.chdir( topdir )
                 continue
 
-            outsciFE, outwhtFE = drizzle.secondDrizzle( fltlistFE, outrootFE, refimage=refim, 
-                                                        ra=ra, dec=dec, rot=rot, imsize_arcsec=imsize_arcsec, 
-                                                        pixscale=pixscale, pixfrac=pixfrac, 
-                                                        clobber=clobber, verbose=verbose, debug=debug  )
+            outsciFE, outwhtFE = drizzle.secondDrizzle(
+                fltlistFE, outrootFE, refimage=refim, ra=ra, dec=dec, rot=rot,
+                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                pixscale=pixscale, pixfrac=pixfrac,
+                clobber=clobber, verbose=verbose, debug=debug  )
 
             outbpxFE = outwhtFE.replace('_wht','_bpx')
-            outbpxFE = badpix.zerowht2badpix( outwhtFE, outbpxFE, verbose=verbose, clobber=clobber )
+            outbpxFE = badpix.zerowht2badpix(
+                outwhtFE, outbpxFE, verbose=verbose, clobber=clobber )
             os.chdir( topdir )
 
 
@@ -283,7 +302,8 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 # User did not define a template epoch, so we default
                 # to use the first available epoch
                 for epoch in epochlist : 
-                    explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
+                    explistFE = [ exp for exp in explist
+                                  if exp.filter==filter and exp.epoch==epoch ]
                     if len(explistFE)==0: continue
                     drzsuffix = explistFE[0].drzsuffix
                     epochdir = explistFE[0].epochdir
@@ -342,6 +362,97 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 diffimMasked = badpix.applyUnionMask( diffim, tempbpxRealpath, thisregbpx )
                 print("Created diff image %s"%diffimMasked )
                 os.chdir( topdir )
-    
+    return 0
+
+def mkparser():
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Run astrodrizzle and tweakreg on a set of flt or flc' +
+        'images, building single-epoch drizzled images and diff images.')
+
+    # Required positional argument
+    parser.add_argument('rootname', help='Root name for the input flt dir (<rootname>.flt), also used for the output _drz products. ')
+
+    # optional arguments :
+    parser.add_argument('--filters', metavar='X,Y,Z', help='Process only these filters (comma-seperated list)',default='')
+    parser.add_argument('--epochs', metavar='X,Y,Z', help='Process only these epochs (comma-seperated list)',default='')
+    parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
+    parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
+    parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
+    parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
+
+    proc = parser.add_argument_group("Processing stages")
+    proc.add_argument('--dosort', action='store_true', help='(1) sort flt files into epochs', default=False)
+    proc.add_argument('--dorefim', action='store_true', help='(2) build the WCS ref image', default=False)
+    proc.add_argument('--dodriz1', action='store_true', help='(3) first astrodrizzle pass (single visit)', default=False)
+    proc.add_argument('--doreg', action='store_true', help='(4) run tweakreg to align with refimage', default=False)
+    proc.add_argument('--dodriz2', action='store_true', help='(5) second astrodrizzle pass (registered visits)', default=False)
+    proc.add_argument('--dodiff', action='store_true', help='(6) subtract and mask to make diff images', default=False)
+    proc.add_argument('--doall', action='store_true', help='Run all necessary processing stages', default=False)
+
+    sortpar = parser.add_argument_group( "Settings for epoch sorting stage")
+    sortpar.add_argument('--mjdmin', metavar='0', type=float, help='All observations prior to this date are put into epoch 0.',default=0)
+    sortpar.add_argument('--mjdmax', metavar='inf', type=float, help='All observations after this date are put into the last epoch.',default=0)
+    sortpar.add_argument('--epochspan', metavar='5', type=float, help='Max number of days spanning a single epoch.',default=5)
+
+    regpar = parser.add_argument_group( "Settings for tweakreg WCS registration stage")
+    regpar.add_argument('--interactive', action='store_true', help='Run tweakreg interactively (showing plots)',default=False)
+    regpar.add_argument('--intravisitreg', action='store_true', help='Run tweakreg before first drizzle stage to do intra-visit registration.',default=False)
+    regpar.add_argument('--refcat', metavar='X.cat', help='Existing source catalog for limiting tweakreg matches.',default='')
+    regpar.add_argument('--searchrad', metavar='X', type=float, help='Search radius in arcsec for tweakreg catalog matching.',default=1.5)
+    regpar.add_argument('--searchthresh', metavar='5', type=float, help='Detection threshold in sigmas for tweakreg object detection.',default=5)
+    regpar.add_argument('--peakmin', metavar='X', type=float, help='Require peak flux above this value for tweakreg object detection.',default=0)
+    regpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=0)
+    regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=0)
+    regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=0)
+    regpar.add_argument('--refimage', metavar='Z.fits', help='Existing WCS reference image. Full path is required.',default='')
+    regpar.add_argument('--refepoch', metavar='X', type=int, help='Use this epoch to define the refimage.',default=0)
+    regpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the refimage.',default='')
+    regpar.add_argument('--refvisit', metavar='X', help='Use this visit to define the refimage.',default='')
+
+    drizpar = parser.add_argument_group( "Settings for astrodrizzle and subtraction stages")
+    drizpar.add_argument('--drizcr', action='store_true', help='Run a fresh CR rejection step in the first drizzle pass.', default=False )
+    drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
+    drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
+    drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
+    drizpar.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
+    drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
+    drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
+    drizpar.add_argument('--wht_type', metavar='ERR', type=str, help='Type of the weight image.', default='ERR')
+    drizpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
+
+    return parser
 
 
+def main() :
+    parser = mkparser()
+    argv = parser.parse_args()
+
+    # TODO : check that the user has provided a sufficient but non-redundant set of parameters
+
+    # Run the pipeline :
+    pipeline(argv.rootname, onlyfilters=(argv.filters or []),
+             onlyepochs=(argv.epochs or []),
+             doall=argv.doall,
+             dosort=argv.dosort, dorefim=argv.dorefim,
+             dodriz1=argv.dodriz1, doreg=argv.doreg,
+             dodriz2=argv.dodriz2, dodiff=argv.dodiff,
+             drizcr=argv.drizcr, intravisitreg=argv.intravisitreg,
+             refim=argv.refimage, refepoch=argv.refepoch,
+             refvisit=argv.refvisit, reffilter=argv.reffilter,
+             tempepoch=argv.tempepoch,
+             refcat=argv.refcat, interactive=argv.interactive,
+             peakmin=argv.peakmin, peakmax=argv.peakmax,
+             rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
+             searchrad=argv.searchrad, threshold=argv.searchthresh,
+             mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
+             epochspan=argv.epochspan,
+             ra=argv.ra, dec=argv.dec, rot=argv.rot,
+             imsize_arcsec=argv.imsize,
+             pixscale=argv.pixscale, pixfrac=argv.pixfrac,
+             wht_type=argv.wht_type,
+             clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
+    return 0
+
+if __name__ == "__main__":
+    main()

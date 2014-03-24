@@ -3,7 +3,7 @@
 # for registration and drizzling
 import exceptions
 
-def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5, 
+def intoEpochs( explist, epochlistfile=None, mjdmin=0, mjdmax=0, epochspan=5,
                 makedirs=False, onlyfilters=[], onlyepochs=[], 
                 checkradec=None, verbose=True, clobber=False ):
     """ 
@@ -11,6 +11,11 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
     into the first epoch, anything with MJD>mjdmax goes into the last
     epoch.  All other epochs are made of exposures taken within
     epochspan days of eachother.
+
+    Provide epochlistfile to specify a file to write the epochs to, or else
+    this will default to <outroot>_epochs.txt using the output rootname
+    of the first exposure.  If the outfile exists and clobbering is turned
+    off, then we adopt the epoch listing in the existing epochlistfile.
 
     Set makedirs=True to copy the flt files into separate epoch
     directories for drizzling
@@ -21,6 +26,14 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
 
     if type(explist)==str : 
         explist = getExpList( explist )
+
+    if not epochlistfile :
+        epochlistfile =  "%s_epochs.txt"%explist[0].outroot
+    if os.path.exists( epochlistfile ) and not clobber :
+        print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
+        explist = read_epoch_list( explist, epochlistfile )
+        epochlist = np.unique( [ exp.epoch for exp in explist ] )
+        return( explist, epochlist )
 
     if onlyfilters :
         if type(onlyfilters)==str :
@@ -35,11 +48,11 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
     epochlist = np.zeros( len(mjdlist) )
 
     thisepochmjd0 = mjdlist.min()
-    thisepoch = 0
+    thisepoch = 1
     for imjd in mjdlist.argsort() : 
         thismjd = mjdlist[imjd]
         if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
-        elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=-1
+        elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
         elif thismjd > thisepochmjd0+epochspan : 
             thisepoch += 1
             thisepochmjd0 = thismjd
@@ -74,14 +87,59 @@ def intoEpochs( explist, mjdmin=0, mjdmax=0, epochspan=5,
             if onlyepochs and exp.epoch not in onlyepochs : 
                 continue
             # Check that the target is on the image before copying files
-            if checkradec :
-                if not checkonimage(exp,checkradec,verbose=verbose) : continue
+            if isinstance(checkradec,list) and len(checkradec)==2:
+                if checkradec[0] and checkradec[1] :
+                    if not checkonimage(exp,checkradec,verbose=verbose) : continue
             if not os.path.isdir( exp.epochdir ):
                 os.makedirs( exp.epochdir )
             if verbose : print("%s ==> %s"%(exp.filename, exp.epochdir) )
             shutil.copy( exp.filepath, exp.epochdir )
 
+    write_epoch_list( explist, epochlistfile, clobber=clobber )
     return( explist, np.unique(epochlist) )
+
+
+def read_epoch_list( explist, epochlistfile ):
+    """Read the epoch sorting scheme from epochlistfile, apply it to
+    the Exposures in explist (i.e. update their .epoch parameters) and
+    return the modified explist.
+
+    Caution : calling this function actually updates the input explist.
+    """
+    from astropy.io import ascii
+    epochtable = ascii.read( epochlistfile )
+    rootnamelist = epochtable['rootname'].tolist()
+    epochlist = epochtable['epoch']
+    for exp in explist :
+        iexp = rootnamelist.index(exp.rootname)
+        exp.epoch = epochlist[iexp]
+    return( explist )
+
+
+def write_epoch_list( explist, outfile, clobber=False ):
+    """Write out a text file listing the Exposures in explist, sorted into
+    epochs and grouped by visit and filter
+    """
+    import os
+    from astropy.table import Table
+
+    if os.path.exists( outfile ) :
+        if clobber :
+            os.path.remove( outfile )
+        else :
+            print("%s exists. Not clobbering."%outfile)
+            return(outfile)
+
+    # TODO : Make tabledata into sorted numpy arrays for formatted output.
+    tabledata = { 'rootname':[exp.rootname for exp in explist],
+                  'epoch':[exp.epoch for exp in explist],
+                  'filter':[exp.filter for exp in explist],
+                  'visit':[exp.visit for exp in explist],
+                  'mjd':[exp.mjd for exp in explist]
+                  }
+    outtable = Table( tabledata  )
+    outtable.write( outfile, format='ascii.commented_header')
+    return( outtable )
 
 
 def getExpList( fltlist='*fl?.fits', outroot='TARGNAME' ):
