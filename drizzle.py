@@ -52,9 +52,9 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
-                     ra=None, dec=None, rot=0, imsize_arcsec=None, 
-                     pixscale=None, pixfrac=None, wht_type='ERR',
-                     clobber=False, verbose=True, debug=False  ) : 
+                   ra=None, dec=None, rot=0, imsize_arcsec=None,
+                   pixscale=None, pixfrac=None, wht_type='ERR',
+                   clobber=False, verbose=True, debug=False  ) :
     """ 
     Run astrodrizzle on a pile of flt images.
     

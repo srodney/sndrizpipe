@@ -65,6 +65,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
        register, sort, drizzle, subtract, mask
     """
     import pyfits
+    import shutil
     if debug : import pdb; pdb.set_trace()
     from drizzlepac.tweakback import tweakback
 
@@ -86,6 +87,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     if type(onlyepochs) in [str,int,float] :
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
+    # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
@@ -102,7 +104,20 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                             mjdmin=mjdmin, mjdmax=mjdmax )
     sort.print_epochs( explist, outfile=epochlistfile, clobber=clobber )
 
+    if refim and not os.path.exists( refim ) :
+        raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
+    if not refim :
+        # No refimage has been specified, so set the default refimage name
+        refdrzdir = '%s.refim'%outroot
+        refimbasename = '%s_wcsref_sci.fits'%(outroot)
+        refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
+
+
+    # STAGE 1 :
+    # copy pristine flt files into epoch sub-directories
     if dosetup :
+        if verbose :
+            print("SNDRIZZLE : (1) SETUP : copying flt files into subdirs")
         sort.into_epoch_dirs( explist, checkradec=[ra,dec],
                               onlyfilters=onlyfilters, onlyepochs=onlyepochs,
                               verbose=verbose, clobber=clobber )
@@ -110,14 +125,66 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
     FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )
     FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )     
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
+    epochlist = sorted( np.unique([ exp.epoch for exp in explist ] ) )
 
-    # STAGE 1 : 
+    # STAGE 2 :
+    # Construct the WCS reference image
+    if dorefim :
+        if verbose :
+            print("SNDRIZZLE : (2) REFIM : Constructing WCS ref image.")
+        if os.path.exists( refim ) and clobber :
+            os.remove( refim )
+        if os.path.exists( refim ) :
+            print("%s already exists.  Not clobbering."%refim)
+        else :
+            refdrzdir = os.path.dirname( refim )
+            if verbose :
+                print( " Constructing reference image %s in %s"%(
+                    os.path.basename(refim), refdrzdir ) )
+
+            # Collect the necessary flt files for constructing the ref image
+            if not refepoch :
+                refepoch = np.min( epochlist )
+            if not reffilter :
+                reffilter = sorted( [ exp.filter for exp in explist
+                                      if exp.epoch==refepoch ] )[0]
+            reffilter = reffilter.lower()
+            if not refvisit :
+                refvisit = sorted( [ exp.visit for exp in explist
+                                     if exp.epoch==refepoch and
+                                        exp.filter==reffilter.lower() ] )[0]
+            refvisit = refvisit.upper()
+            explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch
+                                  and exp.filter==reffilter and exp.visit==refvisit ] )
+
+            refdrzdir = os.path.dirname( refim )
+            if not os.path.isdir( refdrzdir ) :
+                os.makedirs( refdrzdir )
+            os.chdir( refdrzdir )
+            for exp in explistRI :
+                fltfile = os.path.basename(exp.filename)
+                shutil.copy( os.path.join( refsrcdir, fltfile ), fltfile )
+            fltlistRI = [ exp.filename for exp in explistRI ]
+            refimroot = '%s_wcsref'%outroot
+            refimsci, refimwht = drizzle.secondDrizzle(
+                fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
+                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                pixscale=pixscale, pixfrac=pixfrac,
+                clobber=clobber, verbose=verbose, debug=debug  )
+            os.rename(refimsci,refim)
+            os.chdir(topdir)
+
+
+
+    # STAGE 3 :
     # Drizzle together each drizzle group (same epoch, visit and
     # filter), using almost-default parameters, doing CR rejection
     # and applying intravisit registrations if requested.  The output
     # is a drz_sci.fits file in the native rotation.
     if dodriz1 :
-        for FEVgroup in FEVgrouplist : 
+        if verbose :
+            print("SNDRIZZLE : (3) DRIZ1 : first astrodrizzle pass.")
+        for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
             thisfilter = explistFEV[0].filter
@@ -138,105 +205,42 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
                 continue
             if intravisitreg : 
                 # run tweakreg for intravisit registration tweaks
-                register.intraVisit( fltlistFEV, 
-                                     peakmin=peakmin, peakmax=peakmax, threshold=threshold,
-                                     interactive=interactive, debug=debug )
+                register.intraVisit(
+                    fltlistFEV, peakmin=peakmin, peakmax=peakmax,
+                    threshold=threshold, interactive=interactive, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
+
+            # TODO : Update the WCS of the refim so that it matches the reference catalog
+            #if refcat :
+            #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
+            #    register.toCatalog( refim, refcat, refim, rfluxmax=rfluxmax, rfluxmin=rfluxmin,
+            #                        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax, threshold=threshold,
+            #                        interactive=interactive, debug=debug )
+
             os.chdir( topdir )
-
-    # STAGE 2 : 
-    # Define the epoch, visit and filter for the reference image and 
-    # construct it if needed.
-    if dorefim or dodriz1 or dodriz2 :
-        if refim and not os.path.exists( refim ) : 
-            raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
-        if not refim : 
-            # No refimage has been specified, so use
-            # the first FEVgroup to construct one
-            if not refepoch :
-                epochlist = [ exp.epoch for exp in explist ]
-                refepoch = np.min( epochlist )
-            if not reffilter :
-                reffilter = sorted( [ exp.filter for exp in explist
-                                      if exp.epoch==refepoch ] )[0]
-            reffilter = reffilter.lower()
-            if not refvisit :
-                refvisit = sorted( [ exp.visit for exp in explist
-                                     if exp.epoch==refepoch and
-                                        exp.filter==reffilter.lower() ] )[0]
-            refvisit = refvisit.upper()
-            refimroot = '%s_%s_e%02i_v%s_ref'%(outroot,reffilter, refepoch, refvisit)
-            explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch 
-                                  and exp.filter==reffilter and exp.visit==refvisit ] )
-            refepochdir = explistRI[0].epochdir
-            refim = os.path.abspath( os.path.join( refepochdir, '%s_%s_sci.fits'%(refimroot, explistRI[0].drzsuffix ) ) )
-
-    if dorefim : 
-        # If the refimage does not exist, then go make it
-        if os.path.exists( refim ) and clobber : 
-            os.remove( refim )
-        if not os.path.exists( refim ) :
-            if verbose : print( " Constructing reference image %s"%refim)
-            refimroot = refim[:refim.find('_dr')]
-            explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch 
-                                  and exp.filter==reffilter and exp.visit==refvisit ] )
-            refepochdir = explistRI[0].epochdir
-            fltlistRI = [ exp.filename for exp in explistRI ]
-            os.chdir( refepochdir )
-            refimsci, refimwht = drizzle.secondDrizzle(
-                fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
-                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac,
-                clobber=clobber, verbose=verbose, debug=debug  )
-            refim = os.path.abspath( refimsci )
-            os.chdir(topdir)
-
-    refimSymlink = os.path.abspath( '%s_wcsref_drz_sci.fits'%outroot )
-    if ( os.path.islink( refimSymlink ) and 
-         (clobber or not os.path.exists( refimSymlink) ) ): 
-        os.remove( refimSymlink )
-    if refim and not os.path.islink( refimSymlink ) :
-        if os.path.isfile( os.path.abspath( refim ) ) : 
-            os.symlink( os.path.abspath(refim), refimSymlink )
-    if refim and  verbose and os.path.isfile( os.path.abspath( refim ) ) : 
-        print( " Reference image is  %s"%refim)
-        print( "   sym-linked as %s"%refimSymlink)
-
 
 
     if doreg or dodriz2 :
-        if not (os.path.islink( refimSymlink ) and os.path.isfile( os.path.realpath( refimSymlink ) )):
+        if not os.path.exists( refim ):
             raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
-        elif not refim and os.path.islink( refimSymlink ) : 
-            refim = os.path.realpath( refimSymlink )
-        elif not refim : 
-            raise exceptions.RuntimeError("No refim file defined! Can't register without a refim.")
-        else : 
+        else :
             refim = os.path.abspath( refim )
 
-        # Fix the output  ra and dec center point if not provided by the user. 
-        if not ra and not dec : 
+        # Fix the output  ra and dec center point if not provided by the user.
+        if not ra and not dec :
             ra = pyfits.getval( refim, "CRVAL1" )
             dec = pyfits.getval( refim, "CRVAL2" )    
 
-
-        # TODO : Update the WCS of the refim so that it matches the reference catalog
-        #if refcat : 
-        #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
-        #    register.toCatalog( refim, refcat, refim, rfluxmax=rfluxmax, rfluxmin=rfluxmin, 
-        #                        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax, threshold=threshold,
-        #                        interactive=interactive, debug=debug )       
-
-
-        
-    # STAGE 3 : 
+    # STAGE 4 :
     # Run tweakreg to register all the single-visit drz images
     # to a common WCS defined by the refcat/refim, updating the drz file headers.
     # Then use tweakback to propagate that back into the flt files
     if doreg : 
-        for FEVgroup in FEVgrouplist : 
+        if verbose :
+            print("SNDRIZZLE : (4) REG : running tweakreg.")
+        for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
             thisfilter = explistFEV[0].filter
@@ -270,12 +274,14 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
             os.chdir(topdir)
               
 
-    # STAGE 4 
+    # STAGE 5
     # Second and final astrodrizzle pass, wherein we rerun
     # astrodrizzle to get wcs- and pixel-registered drz images
     # combining all flt files with the same filter and epoch.
     if dodriz2 :
-        for FEgroup in FEgrouplist : 
+        if verbose :
+            print("SNDRIZZLE : (5) DRIZ2 : second astrodrizzle pass.")
+        for FEgroup in FEgrouplist :
             explistFE = [ exp for exp in explist if exp.FEgroup == FEgroup ]
             thisepoch = explistFE[0].epoch
             thisfilter = explistFE[0].filter
@@ -308,9 +314,11 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
             os.chdir( topdir )
 
 
-    # STAGE 5 
+    # STAGE 6
     # Define a template epoch for each filter and subtract it from the other epochs
     if dodiff :
+        if verbose :
+            print("SNDRIZZLE : (6) DIFF : subtracting template images.")
         for filter in filterlist :
             if onlyfilters and filter not in onlyfilters : continue
             template = None
@@ -349,7 +357,7 @@ def pipeline( outroot, onlyfilters=[], onlyepochs=[],
 
             # now do the subtractions 
             topdir = os.path.abspath( '.' )
-            for epoch in epochlist : 
+            for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
                 if epoch == tempepoch : continue
                 explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
@@ -400,9 +408,9 @@ def mkparser():
     proc = parser.add_argument_group("Processing stages")
     proc.add_argument('--dosetup', action='store_true', help='(1) copy flt files into epoch subdirs', default=False)
     proc.add_argument('--dorefim', action='store_true', help='(2) build the WCS ref image', default=False)
-    proc.add_argument('--dodriz1', action='store_true', help='(3) first astrodrizzle pass (single visit)', default=False)
+    proc.add_argument('--dodriz1', action='store_true', help='(3) first astrodrizzle pass (pre-registration)', default=False)
     proc.add_argument('--doreg', action='store_true', help='(4) run tweakreg to align with refimage', default=False)
-    proc.add_argument('--dodriz2', action='store_true', help='(5) second astrodrizzle pass (registered visits)', default=False)
+    proc.add_argument('--dodriz2', action='store_true', help='(5) second astrodrizzle pass (registered)', default=False)
     proc.add_argument('--dodiff', action='store_true', help='(6) subtract and mask to make diff images', default=False)
     proc.add_argument('--doall', action='store_true', help='Run all necessary processing stages', default=False)
 
