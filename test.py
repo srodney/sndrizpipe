@@ -13,8 +13,8 @@ def colfaxtest():
     """
     import pipeline
 
-    pipeline.singlepipe( 'colfax', onlyfilters=['F160W'], onlyepochs=[0,1],
-              doall=False, dodiff=True,
+    pipeline.runpipe( 'colfax', onlyfilters=['F160W'], onlyepochs=[0,1],
+              doall=True,
               refcat='goodsn_mosaic.cat', refepoch=1, reffilter='F160W',
               mjdmin=56010, mjdmax=56300, epochspan=5, ra=189.156538, dec=62.309147,
               clobber=False, verbose=True, debug=False )

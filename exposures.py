@@ -64,7 +64,7 @@ def read_epochs( explist, epochlistfile ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def print_epochs( explist, outfile=None, clobber=False ):
+def print_epochs( explist, outfile=None, verbose=True, clobber=False ):
     """Print summary lines for each exposure, epoch by epoch, filter by
     filter, and visit by visit.  Everything is printed to stdout and
     to the given outfile, if provided.
@@ -88,16 +88,18 @@ def print_epochs( explist, outfile=None, clobber=False ):
 
     if outfile:
         print >> fout, header
-    print(header)
+    if verbose :
+        print(header)
     thisepoch = explist[0].epoch
     for exp in explist :
         if exp.epoch!=thisepoch:
             print("")
             if outfile: print>>fout,""
             thisepoch = exp.epoch
-        if outfile:
+        if outfile :
             print >>fout, exp.summaryline_short
-        print( exp.summaryline_short )
+        if verbose :
+            print( exp.summaryline_short )
     if outfile :
         fout.close()
 

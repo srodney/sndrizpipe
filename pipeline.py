@@ -25,20 +25,21 @@ import numpy as np
 
 def multipipe() : 
     """ 
-    Run the pipeline for all flt.<rootname> directories found 
+    Run the pipeline for all <rootname>.flt directories found
     within the current directory
     """
+    # TODO : use parallel processing
     # look for flt/flc files in directories called flt.<rootname>
     fltdirlist = glob.glob("*.flt")
     if not len(fltdirlist) : 
-        exceptions.RuntimeError( "There is no flt.<rootname> directory!")
+        exceptions.RuntimeError( "There is no <rootname>.flt directory!")
         for fltdir in fltdirlist : 
-            singlepipe( fltdir )
+            runpipe( fltdir )
 
 
 
 # TODO : write a log file, recording user settings and results
-def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
+def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # Run all the processing steps
               doall=False,
               # Setup : copy flts into sub-directories
@@ -102,7 +103,8 @@ def singlepipe( outroot, onlyfilters=[], onlyepochs=[],
     else :
         exposures.define_epochs( explist, epochspan=epochspan,
                             mjdmin=mjdmin, mjdmax=mjdmax )
-    exposures.print_epochs( explist, outfile=epochlistfile, clobber=clobber )
+    exposures.print_epochs( explist, outfile=epochlistfile,
+                            verbose=verbose, clobber=clobber )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
@@ -454,7 +456,7 @@ def main() :
     # TODO : check that the user has provided a sufficient but non-redundant set of parameters
 
     # Run the pipeline :
-    singlepipe(argv.rootname, onlyfilters=(argv.filters or []),
+    runpipe(argv.rootname, onlyfilters=(argv.filters or []),
              onlyepochs=(argv.epochs or []),
              doall=argv.doall,
              dosetup=argv.dosetup, dorefim=argv.dorefim,
