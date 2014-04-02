@@ -147,11 +147,16 @@ def checkonimage(exp,checkradec,verbose=True):
     """Check if the given ra,dec falls anywhere within the
     science frame of the image that defines the given Exposure object.
     """
+    import pyfits
     import pywcs
     ra,dec = checkradec
     onimage = False
+    if exp.header['detector'] in ['WFC','UVIS'] : 
+        hdulist = pyfits.open( exp.filepath )
+    else : 
+        hdulist = None
     for hdr in exp.headerlist :
-        expwcs = pywcs.WCS(hdr)
+        expwcs = pywcs.WCS( hdr, hdulist )
         ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
         if ix<0 or ix>expwcs.naxis1 : continue
         if iy<0 or iy>expwcs.naxis2 : continue
