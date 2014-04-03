@@ -46,7 +46,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def read_epochs( explist, epochlistfile ):
+def read_epochs( explist, epochlistfile, checkradec=None ):
     """Read the epoch sorting scheme from epochlistfile, apply it to
     the Exposures in explist (i.e. update their .epoch parameters) and
     return the modified explist.
@@ -58,13 +58,16 @@ def read_epochs( explist, epochlistfile ):
     rootnamelist = epochtable['rootname'].tolist()
     epochlist = epochtable['epoch']
     for exp in explist :
+        if isinstance(checkradec,list) and len(checkradec)==2:
+            if checkradec[0] and checkradec[1] :
+                if not checkonimage(exp,checkradec,verbose=False) : continue
         iexp = rootnamelist.index(exp.rootname)
         exp.epoch = epochlist[iexp]
     # Sort the exposure list by epoch, then filter, then visit
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def print_epochs( explist, outfile=None, verbose=True, clobber=False ):
+def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec=None ):
     """Print summary lines for each exposure, epoch by epoch, filter by
     filter, and visit by visit.  Everything is printed to stdout and
     to the given outfile, if provided.
@@ -92,6 +95,9 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False ):
         print(header)
     thisepoch = explist[0].epoch
     for exp in explist :
+        if isinstance(checkradec,list) and len(checkradec)==2:
+            if checkradec[0] and checkradec[1] :
+                if not checkonimage(exp,checkradec,verbose=verbose) : continue
         if exp.epoch!=thisepoch:
             print("")
             if outfile: print>>fout,""
@@ -164,7 +170,7 @@ def checkonimage(exp,checkradec,verbose=True):
         break
 
     if verbose and not onimage :
-        print("Target RA,Dec is off image ."%())
+        print("Target RA,Dec is off image %s"%(exp.filename))
     return( onimage )
 
 

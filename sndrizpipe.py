@@ -99,12 +99,12 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         epochlistfile =  "%s_epochs.txt"%explist[0].outroot
     if os.path.exists( epochlistfile ) and not clobber :
         print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        exposures.read_epochs( explist, epochlistfile )
+        exposures.read_epochs( explist, epochlistfile, checkradec=[ra,dec] )
     else :
         exposures.define_epochs( explist, epochspan=epochspan,
                             mjdmin=mjdmin, mjdmax=mjdmax )
     exposures.print_epochs( explist, outfile=epochlistfile,
-                            verbose=verbose, clobber=clobber )
+                            verbose=verbose, clobber=clobber, checkradec=[ra,dec] )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
