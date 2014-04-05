@@ -46,7 +46,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def read_epochs( explist, epochlistfile, checkradec=None ):
+def read_epochs( explist, epochlistfile, checkradec=None, onlyfilters=None ):
     """Read the epoch sorting scheme from epochlistfile, apply it to
     the Exposures in explist (i.e. update their .epoch parameters) and
     return the modified explist.
@@ -58,16 +58,21 @@ def read_epochs( explist, epochlistfile, checkradec=None ):
     rootnamelist = epochtable['rootname'].tolist()
     epochlist = epochtable['epoch']
     for exp in explist :
+        if onlyfilters and exp.filter not in onlyfilters :
+            continue
         if isinstance(checkradec,list) and len(checkradec)==2:
             if checkradec[0] and checkradec[1] :
                 if not checkonimage(exp,checkradec,verbose=False) : continue
-        iexp = rootnamelist.index(exp.rootname)
+        try:
+            iexp = rootnamelist.index(exp.rootname)
+        except ValueError:
+            continue
         exp.epoch = epochlist[iexp]
     # Sort the exposure list by epoch, then filter, then visit
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec=None ):
+def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec=None, onlyfilters=None, onlyepochs=None ):
     """Print summary lines for each exposure, epoch by epoch, filter by
     filter, and visit by visit.  Everything is printed to stdout and
     to the given outfile, if provided.
@@ -95,6 +100,10 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec
         print(header)
     thisepoch = explist[0].epoch
     for exp in explist :
+        if onlyfilters and exp.filter not in onlyfilters :
+            continue
+        if onlyepochs and exp.epoch not in onlyepochs :
+            continue
         if isinstance(checkradec,list) and len(checkradec)==2:
             if checkradec[0] and checkradec[1] :
                 if not checkonimage(exp,checkradec,verbose=verbose) : continue
@@ -239,6 +248,7 @@ class Exposure( object ):
                     self.crsplit = 2
 
         self.rootname = self.header['ROOTNAME']
+        self.exposure_time = self.header['EXPTIME']
 
 
         # 2-digits uniquely identifying this visit and this exposure
