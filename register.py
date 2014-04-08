@@ -60,7 +60,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                               rfluxcol=3, rfluxunits='mag',
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                               searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
-                              separation=0.0, tolerance=1.5, 
+                              separation=0.0, tolerance=1.5, minobj=10,
                               clean=(not debug) )
             print( "==============================\n sndrizzle.register:\n")
             userin = raw_input("Adopt these tweakreg settings? y/[n]").lower()
@@ -103,7 +103,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                       rfluxcol=3, rfluxunits='mag',
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
-                      separation=0.0, tolerance=1.5, 
+                      separation=0.0, tolerance=1.5, minobj=10,
                       clean=(not debug) )
     return( wcsname )
 
