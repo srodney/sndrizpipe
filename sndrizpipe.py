@@ -94,17 +94,19 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
     explist = exposures.get_explist( fltlist, outroot=outroot )
-
+    
     if not epochlistfile :
         epochlistfile =  "%s_epochs.txt"%explist[0].outroot
     if os.path.exists( epochlistfile ) and not clobber :
         print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        exposures.read_epochs( explist, epochlistfile )
+        exposures.read_epochs( explist, epochlistfile, checkradec=[ra,dec], 
+                            onlyfilters=onlyfilters )
     else :
         exposures.define_epochs( explist, epochspan=epochspan,
                             mjdmin=mjdmin, mjdmax=mjdmax )
     exposures.print_epochs( explist, outfile=epochlistfile,
-                            verbose=verbose, clobber=clobber )
+                            verbose=verbose, clobber=clobber, checkradec=[ra,dec], 
+                            onlyfilters=onlyfilters, onlyepochs=onlyepochs )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
@@ -114,6 +116,15 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         refimbasename = '%s_wcsref_sci.fits'%(outroot)
         refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
 
+    new_explist = []
+    for exp in explist:
+        if onlyfilters and exp.filter not in onlyfilters :
+            continue
+        elif onlyepochs and exp.epoch not in onlyepochs :
+            continue
+        else:
+            new_explist.append( exp )
+    explist = new_explist
 
     # STAGE 1 :
     # copy pristine flt files into epoch sub-directories
@@ -151,11 +162,25 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 reffilter = sorted( [ exp.filter for exp in explist
                                       if exp.epoch==refepoch ] )[0]
             reffilter = reffilter.lower()
+            
+            # if refvisit is not set, then find the maximum depth visit and use that
             if not refvisit :
-                refvisit = sorted( [ exp.visit for exp in explist
-                                     if exp.epoch==refepoch and
-                                        exp.filter==reffilter.lower() ] )[0]
+                visits, exp_times, visit_depth = np.array( ([], [], []) )
+                for exp in explist:
+                    if (exp.epoch != refepoch) and (exp.filter != reffilter):
+                        continue
+                    visits    = np.append( visits, exp.visit )
+                    exp_times = np.append( exp_times, exp.exposure_time )
+                unique_visits = np.unique( visits )
+                for u in unique_visits:
+                    ind = np.where( visits == u )
+                    visit_depth = np.append( visit_depth, np.sum(exp_times[ind]) )
+                max_ind  = np.argmax( visit_depth )
+                refvisit = unique_visits[max_ind]
+            
+            
             refvisit = refvisit.upper()
+            
             explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch
                                   and exp.filter==reffilter and exp.visit==refvisit ] )
 
@@ -176,6 +201,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 clobber=clobber, verbose=verbose, debug=debug  )
             os.rename(refimsci,refim)
             os.chdir(topdir)
+            
+            print refvisit
 
     # STAGE 3 :
     # Drizzle together each drizzle group (same epoch, visit and
