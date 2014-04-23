@@ -76,7 +76,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     # define the default astrodrizzle parameters for this camera
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
-    drizpar = getdrizpar( instrument, detector) 
+    drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist) ) 
 
     if not pixscale : pixscale = drizpar['pixscale']
     if not pixfrac : pixfrac = drizpar['pixfrac']
