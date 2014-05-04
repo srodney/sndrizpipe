@@ -93,19 +93,18 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
-    explist = exposures.get_explist( fltlist, outroot=outroot )
+    explist = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
     
     if not epochlistfile :
         epochlistfile =  "%s_epochs.txt"%explist[0].outroot
-    if os.path.exists( epochlistfile ) and not clobber :
+    if os.path.exists( epochlistfile ) :
         print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        exposures.read_epochs( explist, epochlistfile, checkradec=[ra,dec], 
-                            onlyfilters=onlyfilters )
+        exposures.read_epochs( explist, epochlistfile, onlyfilters=onlyfilters )
     else :
         exposures.define_epochs( explist, epochspan=epochspan,
                             mjdmin=mjdmin, mjdmax=mjdmax )
     exposures.print_epochs( explist, outfile=epochlistfile,
-                            verbose=verbose, clobber=clobber, checkradec=[ra,dec], 
+                            verbose=verbose, clobber=clobber,
                             onlyfilters=onlyfilters, onlyepochs=onlyepochs )
 
     if refim and not os.path.exists( refim ) :
@@ -116,8 +115,12 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         refimbasename = '%s_wcsref_sci.fits'%(outroot)
         refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
 
+    # reduce the working exposure list to contain only those exposures
+    # that we actually want to process
     new_explist = []
     for exp in explist:
+        if exp.epoch==-1 or not exp.ontarget :
+            continue
         if onlyfilters and exp.filter not in onlyfilters :
             continue
         elif onlyepochs and exp.epoch not in onlyepochs :
@@ -131,7 +134,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if dosetup :
         if verbose :
             print("SNDRIZZLE : (1) SETUP : copying flt files into subdirs")
-        exposures.copy_to_epochdirs( explist, checkradec=[ra,dec],
+        exposures.copy_to_epochdirs( explist,
                               onlyfilters=onlyfilters, onlyepochs=onlyepochs,
                               verbose=verbose, clobber=clobber )
 

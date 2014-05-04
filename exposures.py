@@ -4,12 +4,12 @@
 # flt files into epoch subdirs for registration
 # and drizzling.
 
-def get_explist( fltlist='*fl?.fits', outroot='TARGNAME' ):
+def get_explist( fltlist='*fl?.fits', outroot='TARGNAME', targetradec=[None,None] ):
     """ make a list of Exposure objects for each flt file"""
     from stsci import tools
     if type(fltlist)==str :
         fltlist=tools.parseinput.parseinput(fltlist)[0]
-    return( [ Exposure( fltfile, outroot=outroot ) for fltfile in fltlist ] )
+    return( [ Exposure( fltfile, outroot=outroot, targetradec=targetradec ) for fltfile in fltlist ] )
 
 
 def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
@@ -34,7 +34,10 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     thisepoch = 1
     for imjd in mjdlist.argsort() :
         thismjd = mjdlist[imjd]
-        if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
+        exp = explist[imjd]
+        if exp.epoch == -1 or not exp.ontarget :
+            thisepoch = -1
+        elif (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
         elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
         elif thismjd > thisepochmjd0+epochspan :
             thisepoch += 1
@@ -46,7 +49,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def read_epochs( explist, epochlistfile, checkradec=None, onlyfilters=None ):
+def read_epochs( explist, epochlistfile, onlyfilters=None ):
     """Read the epoch sorting scheme from epochlistfile, apply it to
     the Exposures in explist (i.e. update their .epoch parameters) and
     return the modified explist.
@@ -60,9 +63,6 @@ def read_epochs( explist, epochlistfile, checkradec=None, onlyfilters=None ):
     for exp in explist :
         if onlyfilters and exp.filter not in onlyfilters :
             continue
-        if isinstance(checkradec,list) and len(checkradec)==2:
-            if checkradec[0] and checkradec[1] :
-                if not checkonimage(exp,checkradec,verbose=False) : continue
         try:
             iexp = rootnamelist.index(exp.rootname)
         except ValueError:
@@ -72,7 +72,7 @@ def read_epochs( explist, epochlistfile, checkradec=None, onlyfilters=None ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec=None, onlyfilters=None, onlyepochs=None ):
+def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilters=None, onlyepochs=None ):
     """Print summary lines for each exposure, epoch by epoch, filter by
     filter, and visit by visit.  Everything is printed to stdout and
     to the given outfile, if provided.
@@ -104,9 +104,6 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec
             continue
         if onlyepochs and exp.epoch not in onlyepochs :
             continue
-        if isinstance(checkradec,list) and len(checkradec)==2:
-            if checkradec[0] and checkradec[1] :
-                if not checkonimage(exp,checkradec,verbose=verbose) : continue
         if exp.epoch!=thisepoch:
             print("")
             if outfile: print>>fout,""
@@ -119,7 +116,7 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, checkradec
         fout.close()
 
 def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
-                       checkradec=None, verbose=True, clobber=False ):
+                       verbose=True, clobber=False ):
     """ Given a list of Exposure objects in explist, copy the flt files into
     separate epoch directories for drizzling -- limited to the Exposures that
     match the constraints in onlyfilters and onlyepochs.
@@ -143,14 +140,11 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
 
     for exp in explist :
         # only copy files for the given filter and epoch
+        if exp.epoch==-1 or not exp.ontarget : continue
         if onlyfilters and exp.filter not in onlyfilters :
             continue
         if onlyepochs and exp.epoch not in onlyepochs :
             continue
-        # Check that the target is on the image before copying files
-        if isinstance(checkradec,list) and len(checkradec)==2:
-            if checkradec[0] and checkradec[1] :
-                if not checkonimage(exp,checkradec,verbose=verbose) : continue
         if not os.path.isdir( exp.epochdir ):
             os.makedirs( exp.epochdir )
         if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
@@ -158,7 +152,7 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
 
 
 
-def checkonimage(exp,checkradec,verbose=True):
+def checkonimage(exp,checkradec,verbose=False):
     """Check if the given ra,dec falls anywhere within the
     science frame of the image that defines the given Exposure object.
     """
@@ -188,7 +182,7 @@ class Exposure( object ):
     them into groups by epoch and band for astrodrizzling.
     """
 
-    def __init__( self, filename, outroot='TARGNAME' ) : 
+    def __init__( self, filename, outroot='TARGNAME', targetradec=[None,None] ) :
         import pyfits
         import os
         from math import ceil
@@ -258,6 +252,14 @@ class Exposure( object ):
 
         # epoch to be defined later
         self.epoch  = 99
+
+        # if target ra,dec provided, check that the source is on the image
+        self.ontarget=True
+        if targetradec[0] is not None and targetradec[1] is not None:
+            if not checkonimage(self,targetradec):
+                self.epoch=-1
+                self.ontarget = False
+
 
     @property
     def epochdir( self ):
