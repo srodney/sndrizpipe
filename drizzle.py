@@ -30,14 +30,21 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     hdr=hdulist[0].header
     hdulist.close()
 
+    # If we only have one image, skip the median,blot,and driz_cr steps
+    docombine=True
+    if len(fltlist)==1:
+        docombine=False
+
     # define the default astrodrizzle parameters for this camera
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
-    astrodrizzle.AstroDrizzle( 
+    astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False, resetbits=int(driz_cr and 4096),
-        restore=True, preserve=True, overwrite=False, clean=True, 
+        restore=True, preserve=True, overwrite=False, clean=True,
+        median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
+        combine_type='iminmed',
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
         driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'], 
@@ -52,7 +59,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
-                   ra=None, dec=None, rot=0, imsize_arcsec=None,
+                   ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
                    pixscale=None, pixfrac=None, wht_type='ERR',
                    clobber=False, verbose=True, debug=False  ) :
     """ 
@@ -88,11 +95,17 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         #grab the target ra and dec from the header of the first file
         ra,dec = hdr['RA_TARG'],hdr['DEC_TARG']
 
+    # If we only have one image, skip the median,blot,and driz_cr steps
+    docombine=True
+    if len(fltlist)==1:
+        docombine=False
+
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle( 
         fltlist, output=outroot, updatewcs=False, resetbits=0,
         restore=False, preserve=True, overwrite=True, clean=True, 
-        driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale, 
+        median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
+        driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
         driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix, 
         final_wcs=True, final_pixfrac=pixfrac, final_scale=pixscale,

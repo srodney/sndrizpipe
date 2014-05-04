@@ -10,11 +10,11 @@ from drizzlepac import tweakreg, astrodrizzle
 import stwcs
 
 
-def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None, 
+def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZZLE', 
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  peakmin=None, peakmax=None, threshold=4.0,
-                 fitgeometry='rscale',
+                 minobj=10, fitgeometry='rscale',
                  interactive=False, clobber=False, debug=False ):
     if debug : import pdb; pdb.set_trace()
 
@@ -55,13 +55,16 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
             print( "sndrizzle.register:  Running a tweakreg loop interactively.")
             tweakreg.TweakReg(fltfilestr, updatehdr=False, wcsname='TWEAK', 
                               see2dplot=True, residplot='both', 
-                              fitgeometry=fitgeometry, refcat=refcat, refimage=refim,
-                              refxcol=1, refycol=2, refxyunits='degrees', 
-                              rfluxcol=3, rfluxunits='mag',
+                              fitgeometry=fitgeometry, refcat=refcat,
+                              refimage=refim, refxcol=1, refycol=2,
+                              refxyunits='degrees', rfluxcol=3,
+                              rfluxunits='mag',
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
-                              searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
-                              separation=0.0, tolerance=1.5, minobj=10,
-                              clean=(not debug) )
+                              searchrad=searchrad, conv_width=conv_width,
+                              threshold=threshold,
+                              separation=0.0, tolerance=1.5, minobj=minobj,
+                              clean=(not (interactive or debug) ),
+                              writecat=(interactive or debug) )
             print( "==============================\n sndrizzle.register:\n")
             userin = raw_input("Adopt these tweakreg settings? y/[n]").lower()
             if userin.startswith('y'): 
@@ -110,7 +113,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
 
 
 def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
-                interactive=False, clobber=False, debug=False ):
+                minobj=10, interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images belonging to the same visit, 
     updating their WCS for alignment with the WCS of the first in the list. 
@@ -123,13 +126,13 @@ def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
     if debug : import pdb; pdb.set_trace() 
     wcsname = RunTweakReg(
         fltlist, refcat=None, wcsname='INTRAVIS', searchrad=1.0,
-        peakmin=peakmin, peakmax=peakmax, fitgeometry='shift',
+        peakmin=peakmin, peakmax=peakmax, fitgeometry='shift', minobj=minobj,
         threshold=threshold, interactive=interactive,  clobber=clobber )
     return( wcsname )
 
 
 def toFirstim( fltlist, searchrad=1.0,
-               peakmin=None, peakmax=None, threshold=4.0,
+               peakmin=None, peakmax=None, threshold=4.0, minobj=10,
                interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images, updating their WCS for
@@ -145,7 +148,7 @@ def toFirstim( fltlist, searchrad=1.0,
     wcsname = RunTweakReg(
         fltlist, refcat=None, wcsname='FIRSTIM:%s'%firstimfile,
         searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
-        threshold=threshold, interactive=interactive,
+        threshold=threshold, interactive=interactive, minobj=minobj,
         clobber=clobber, debug=debug )
     return( wcsname )
 
@@ -154,6 +157,7 @@ def toFirstim( fltlist, searchrad=1.0,
 def toRefim( filelist, refim, refcat=None,
              rfluxmax=27, rfluxmin=18, searchrad=1.0,
              peakmin=None, peakmax=None, threshold=4.0,
+             minobj=10,
              interactive=False, clobber=False, debug=False ):
     """Run tweakreg on a list of flt or drz images to bring them into
     alignment with the given reference image, refim.  Optionally a
@@ -177,6 +181,7 @@ def toRefim( filelist, refim, refcat=None,
         wcsname='REFIM:%s'%os.path.basename(refim),
         rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
         peakmin=peakmin, peakmax=peakmax, threshold=threshold,
+        minobj=10,
         interactive=interactive, clobber=clobber, debug=debug )
     return( wcsname )
 

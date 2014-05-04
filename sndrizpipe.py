@@ -56,7 +56,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               dodiff=False, tempepoch=0,
               refcat=None,
               interactive=False, threshold=4, peakmin=None, peakmax=None,
-              rfluxmax=27, rfluxmin=14, searchrad=1.5,
+              rfluxmax=27, rfluxmin=14, searchrad=1.5, minobj=10,
               mjdmin=0, mjdmax=0, epochspan=5,
               ra=None, dec=None, rot=0, imsize_arcsec=None, 
               pixscale=None, pixfrac=None, wht_type='ERR',
@@ -234,7 +234,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             if intravisitreg : 
                 # run tweakreg for intravisit registration tweaks
                 register.intraVisit(
-                    fltlistFEV, peakmin=peakmin, peakmax=peakmax,
+                    fltlistFEV, peakmin=peakmin, peakmax=peakmax, minobj=minobj,
                     threshold=threshold, interactive=interactive, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
@@ -293,7 +293,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             wcsname = register.toRefim(
                 outsciFEV, refim=refimpath, refcat=refcatpath,
                 searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
-                threshold=threshold,
+                threshold=threshold, minobj=minobj,
                 interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
@@ -333,7 +333,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             outsciFE, outwhtFE = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=refim, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac,
+                pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
                 clobber=clobber, verbose=verbose, debug=debug  )
 
             outbpxFE = outwhtFE.replace('_wht','_bpx')
@@ -460,9 +460,13 @@ def mkparser():
     regpar.add_argument('--refepoch', metavar='X', type=int, help='Use this epoch to define the refimage.',default=0)
     regpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the refimage.',default='')
     regpar.add_argument('--refvisit', metavar='X', help='Use this visit to define the refimage.',default='')
+    regpar.add_argument('--minobj', metavar='X', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
 
     drizpar = parser.add_argument_group( "Settings for astrodrizzle and subtraction stages")
-    drizpar.add_argument('--drizcr', action='store_true', help='Run a fresh CR rejection step in the first drizzle pass.', default=False )
+    drizpar.add_argument('--drizcr', metavar='N', type=int,
+                         help='Run a fresh CR rejection step to replace existing flt CR flags.'+\
+                         '\nUse --drizcr 1 to run CR rejection only within the visit.'+\
+                         '\nUse --drizcr 2 to also flag CRs at the multi-visit drizzle stage.', default=False )
     drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
@@ -501,6 +505,7 @@ def main() :
              peakmin=argv.peakmin, peakmax=argv.peakmax,
              rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
              searchrad=argv.searchrad, threshold=argv.searchthresh,
+             minobj=argv.minobj,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
              ra=argv.ra, dec=argv.dec, rot=argv.rot,
