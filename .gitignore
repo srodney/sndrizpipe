@@ -4,6 +4,9 @@
 \#*\#
 commit.txt
 
+# executables (e.g. the UVIS CTE correction code)
+*.e
+
 # C extensions
 *.so
 
