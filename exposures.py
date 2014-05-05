@@ -152,15 +152,16 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
 
 
 
-def checkonimage(exp,checkradec,verbose=False):
+def checkonimage(exp,checkradec,verbose=False, debug=False):
     """Check if the given ra,dec falls anywhere within the
     science frame of the image that defines the given Exposure object.
     """
     import pyfits
     import pywcs
+    if debug : import pdb; pdb.set_trace()
     ra,dec = checkradec
     onimage = False
-    if exp.header['detector'] in ['WFC','UVIS'] : 
+    if exp.header['detector'] in ['WFC','UVIS'] :
         hdulist = pyfits.open( exp.filepath )
     else : 
         hdulist = None
