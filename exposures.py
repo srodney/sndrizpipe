@@ -35,16 +35,18 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     for imjd in mjdlist.argsort() :
         thismjd = mjdlist[imjd]
         exp = explist[imjd]
-        if exp.epoch == -1 or not exp.ontarget :
-            thisepoch = -1
-        elif (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
+        if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
         elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
         elif thismjd > thisepochmjd0+epochspan :
             thisepoch += 1
             thisepochmjd0 = thismjd
         for ithisvis in np.where( visitlist == visitlist[imjd] )[0] :
-            epochlist[ ithisvis ] = thisepoch
-            explist[ ithisvis ].epoch = thisepoch
+            if exp.epoch == -1 or not exp.ontarget :
+                epochlist[ ithisvis ] = -1
+                explist[ ithisvis ].epoch = -1
+            else :
+                epochlist[ ithisvis ] = thisepoch
+                explist[ ithisvis ].epoch = thisepoch
     # Sort the exposure list by epoch, then filter, then visit
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
