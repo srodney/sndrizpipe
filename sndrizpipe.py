@@ -170,22 +170,25 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             
             # if refvisit is not set, then find the maximum depth visit and use that
             if not refvisit :
-                visits, exp_times, visit_depth = np.array( ([], [], []) )
-                for exp in explist_all:
-                    if (exp.epoch != refepoch) and (exp.filter != reffilter):
-                        continue
-                    visits    = np.append( visits, exp.visit )
-                    exp_times = np.append( exp_times, exp.exposure_time )
+                #visits, exp_times, visit_depth = np.array( ([], [], []) )
+                explistRIvisfind = [ exp for exp in explist_all
+                        if (exp.epoch==refepoch and exp.filter==reffilter) ]
+                visits = [exp.visit for exp in explistRIvisfind ]
+                exp_times = [exp.exposure_time for exp in explistRIvisfind ]
                 unique_visits = np.unique( visits )
-                for u in unique_visits:
-                    ind = np.where( visits == u )
-                    visit_depth = np.append( visit_depth, np.sum(exp_times[ind]) )
-                if len(unique_visits)<1:
+                if len(unique_visits)==1:
+                    refvisit = unique_visits[0]
+                elif len(unique_visits)<1:
                     raise exceptions.RuntimeError(
-                        "No visits satisfy the refimage requirements:"+\
-                        "  filter = %s\n  epoch = %s"%(reffilter,refepoch) )
-                max_ind  = np.argmax( visit_depth )
-                refvisit = unique_visits[max_ind]
+                        "No visits satisfy the refimage requirements:\n"+\
+                        "  filter = %s     epoch = %s"%(reffilter,refepoch) )
+                else :
+                    visindices = [ np.where(np.char.equal(visits,vis))[0]
+                                   for vis in unique_visits ]
+                    visit_depth = np.array( [ np.sum(exp_times[ivis])
+                                              for ivis in visindices ] )
+                    ideepest  = np.argmax( visit_depth )
+                    refvisit = unique_visits[ideepest]
             refvisit = refvisit.upper()
             
             explistRI = sorted( [ exp for exp in explist_all if exp.epoch==refepoch
@@ -196,7 +199,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 os.makedirs( refdrzdir )
             for exp in explistRI :
                 fltfile = os.path.basename( exp.filename )
-                refsrcdir = os.path.abspath( exp.epochdir )
+                refsrcdir = os.path.abspath( fltdir )
                 shutil.copy( os.path.join( refsrcdir, fltfile ), refdrzdir )
             fltlistRI = [ exp.filename for exp in explistRI ]
             refimroot = '%s_wcsref'%outroot
