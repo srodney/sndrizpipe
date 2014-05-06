@@ -13,7 +13,7 @@ import stwcs
 def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZZLE', 
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
-                 peakmin=None, peakmax=None, threshold=4.0,
+                 fluxmin=None, fluxmax=None, threshold=4.0,
                  minobj=10, fitgeometry='rscale',
                  interactive=False, clobber=False, debug=False ):
     if debug : import pdb; pdb.set_trace()
@@ -74,8 +74,8 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
             printfloat("   rfluxmin = %.1f  # min mag for refcat sources", rfluxmin)
             printfloat("   rfluxmax = %.1f  # max mag for refcat sources", rfluxmax)
             printfloat("   searchrad  = %.1f  # matching search radius (arcsec)", searchrad )
-            printfloat("   peakmin    = %.1f  # min peak flux for good sources", peakmin )
-            printfloat("   peakmax    = %.1f  # max peak flux for good sources", peakmax )
+            printfloat("   fluxmin    = %.1f  # min total flux for detected sources", fluxmin )
+            printfloat("   fluxmax    = %.1f  # max total flux for detected sources", fluxmax )
             printfloat("   threshold  = %.1f  # detection threshold in sigma ", threshold )
             printfloat("   fitgeometry= %s  # fitting geometry [shift,rscale] ", fitgeometry )
             print('Adjust parameters using "parname = value" syntax.') 
@@ -92,8 +92,8 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                 if parname=='rfluxmin' : rfluxmin=float( value )
                 elif parname=='rfluxmax' : rfluxmax=float( value )
                 elif parname=='searchrad' : searchrad=float( value )
-                elif parname=='peakmin' : peakmin=float( value )
-                elif parname=='peakmax' : peakmax=float( value )
+                elif parname=='fluxmin' : fluxmin=float( value )
+                elif parname=='fluxmax' : fluxmax=float( value )
                 elif parname=='threshold' : threshold=float( value )
                 elif parname=='fitgeometry' : fitgeometry=value
 
@@ -112,7 +112,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
 
 
 
-def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
+def intraVisit( fltlist, fluxmin=None, fluxmax=None, threshold=4.0,
                 minobj=10, interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images belonging to the same visit, 
@@ -126,13 +126,13 @@ def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
     if debug : import pdb; pdb.set_trace() 
     wcsname = RunTweakReg(
         fltlist, refcat=None, wcsname='INTRAVIS', searchrad=1.0,
-        peakmin=peakmin, peakmax=peakmax, fitgeometry='shift', minobj=minobj,
+        fluxmin=fluxmin, fluxmax=fluxmax, fitgeometry='shift', minobj=minobj,
         threshold=threshold, interactive=interactive,  clobber=clobber )
     return( wcsname )
 
 
 def toFirstim( fltlist, searchrad=1.0,
-               peakmin=None, peakmax=None, threshold=4.0, minobj=10,
+               fluxmin=None, fluxmax=None, threshold=4.0, minobj=10,
                interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images, updating their WCS for
@@ -147,7 +147,7 @@ def toFirstim( fltlist, searchrad=1.0,
     firstimfile = os.path.basename(fltlist[0])
     wcsname = RunTweakReg(
         fltlist, refcat=None, wcsname='FIRSTIM:%s'%firstimfile,
-        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
+        searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
         threshold=threshold, interactive=interactive, minobj=minobj,
         clobber=clobber, debug=debug )
     return( wcsname )
@@ -156,7 +156,7 @@ def toFirstim( fltlist, searchrad=1.0,
 
 def toRefim( filelist, refim, refcat=None,
              rfluxmax=27, rfluxmin=18, searchrad=1.0,
-             peakmin=None, peakmax=None, threshold=4.0,
+             fluxmin=None, fluxmax=None, threshold=4.0,
              minobj=10,
              interactive=False, clobber=False, debug=False ):
     """Run tweakreg on a list of flt or drz images to bring them into
@@ -180,8 +180,8 @@ def toRefim( filelist, refim, refcat=None,
         filelist, refim=refim, refcat=refcat,
         wcsname='REFIM:%s'%os.path.basename(refim),
         rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
-        peakmin=peakmin, peakmax=peakmax, threshold=threshold,
-        minobj=10,
+        fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
+        minobj=minobj,
         interactive=interactive, clobber=clobber, debug=debug )
     return( wcsname )
 
@@ -222,7 +222,7 @@ def printfloat( fmtstr, value ):
 
 
 def mkSourceCatalog( imfile, computesig=True, skysigma=0,
-                     threshold=4.0, peakmin=None, peakmax=None ) :
+                     threshold=4.0, fluxmin=None, fluxmax=None ) :
     import pywcs
     from drizzlepac import catalogs
 
@@ -255,7 +255,10 @@ AttributeError: 'WCS' object has no attribute 'extname'
     wcs = pywcs.WCS( hdr )
     wcs = pywcs.WCS( header=hdr, fobj=image )
 
-    imcat = catalogs.generateCatalog(wcs, mode='automatic',catalog=None, computesig=computesig, skysigma=skysigma, threshold=threshold, peakmin=peakmin, peakmax=peakmax, conv_width=conv_width )
+    imcat = catalogs.generateCatalog(
+        wcs, mode='automatic',catalog=None,
+        computesig=computesig, skysigma=skysigma, threshold=threshold,
+        fluxmin=fluxmin, fluxmax=fluxmax, conv_width=conv_width )
     return( imcat )
 
 

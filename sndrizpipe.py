@@ -55,8 +55,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # make diff images
               dodiff=False, tempepoch=0,
               refcat=None,
-              interactive=False, threshold=4, peakmin=None, peakmax=None,
-              rfluxmax=27, rfluxmin=14, searchrad=1.5, minobj=10,
+              interactive=False, threshold=4, fluxmin=None, fluxmax=None,
+              rfluxmax=None, rfluxmin=None, searchrad=1.5, minobj=10,
               mjdmin=0, mjdmax=0, epochspan=5,
               ra=None, dec=None, rot=0, imsize_arcsec=None, 
               pixscale=None, pixfrac=None, wht_type='ERR',
@@ -244,7 +244,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             if intravisitreg : 
                 # run tweakreg for intravisit registration tweaks
                 register.intraVisit(
-                    fltlistFEV, peakmin=peakmin, peakmax=peakmax, minobj=minobj,
+                    fltlistFEV, fluxmin=fluxmin, fluxmax=fluxmax, minobj=minobj,
                     threshold=threshold, interactive=interactive, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
@@ -254,7 +254,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             #if refcat :
             #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
             #    register.toCatalog( refim, refcat, refim, rfluxmax=rfluxmax, rfluxmin=rfluxmin,
-            #                        searchrad=searchrad, peakmin=peakmin, peakmax=peakmax, threshold=threshold,
+            #                        searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
             #                        interactive=interactive, debug=debug )
 
             os.chdir( topdir )
@@ -302,8 +302,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             origwcs = pyfits.getval( outsciFEV,'WCSNAME').strip()
             wcsname = register.toRefim(
                 outsciFEV, refim=refimpath, refcat=refcatpath,
-                searchrad=searchrad, peakmin=peakmin, peakmax=peakmax,
+                searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
                 threshold=threshold, minobj=minobj,
+                rfluxmin=rfluxmin, rfluxmax=rfluxmax,
                 interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
@@ -512,8 +513,9 @@ def main() :
              refvisit=argv.refvisit, reffilter=argv.reffilter,
              tempepoch=argv.tempepoch,
              refcat=argv.refcat, interactive=argv.interactive,
-             peakmin=argv.peakmin, peakmax=argv.peakmax,
-             rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
+             fluxmin=argv.peakmin, fluxmax=argv.peakmax,
+             rfluxmax=argv.rfluxmin or None,
+             rfluxmin=argv.rfluxmax or None,
              searchrad=argv.searchrad, threshold=argv.searchthresh,
              minobj=argv.minobj,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
