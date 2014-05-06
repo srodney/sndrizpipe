@@ -56,7 +56,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               dodiff=False, tempepoch=0,
               refcat=None,
               interactive=False, threshold=4, fluxmin=None, fluxmax=None,
-              rfluxmax=None, rfluxmin=None, searchrad=1.5, minobj=10,
+              rfluxmax=None, rfluxmin=None, refnbright=None,
+              searchrad=1.5, minobj=10,
               mjdmin=0, mjdmax=0, epochspan=5,
               ra=None, dec=None, rot=0, imsize_arcsec=None, 
               pixscale=None, pixfrac=None, wht_type='ERR',
@@ -253,7 +254,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # TODO : Update the WCS of the refim so that it matches the reference catalog
             #if refcat :
             #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
-            #    register.toCatalog( refim, refcat, refim, rfluxmax=rfluxmax, rfluxmin=rfluxmin,
+            #    register.toCatalog( refim, refcat, refim, refnbright=refnbright, rfluxmax=rfluxmax, rfluxmin=rfluxmin,
             #                        searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
             #                        interactive=interactive, debug=debug )
 
@@ -304,7 +305,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 outsciFEV, refim=refimpath, refcat=refcatpath,
                 searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
                 threshold=threshold, minobj=minobj,
-                rfluxmin=rfluxmin, rfluxmax=rfluxmax,
+                refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
                 interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
@@ -467,6 +468,7 @@ def mkparser():
     regpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=0)
     regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=0)
     regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=0)
+    regpar.add_argument('--refnbright', metavar='X', type=float, help='Number of brightest objects to use from the tweakreg reference catalog.',default=0)
     regpar.add_argument('--refimage', metavar='Z.fits', help='Existing WCS reference image. Full path is required.',default='')
     regpar.add_argument('--refepoch', metavar='X', type=int, help='Use this epoch to define the refimage.',default=0)
     regpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the refimage.',default='')
@@ -516,6 +518,7 @@ def main() :
              fluxmin=argv.peakmin, fluxmax=argv.peakmax,
              rfluxmax=argv.rfluxmin or None,
              rfluxmin=argv.rfluxmax or None,
+             refnbright=argv.refnbright or None,
              searchrad=argv.searchrad, threshold=argv.searchthresh,
              minobj=argv.minobj,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,

@@ -62,7 +62,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description='Convert a source catalog into the format required '
-                    'for use as a tweakreg reference catalog.')
+                    'for use as a tweakreg reference catalog.'
+                    '(Requires astropy)' )
 
     # Required positional argument
     parser.add_argument('incatfile', help='Input catalog. May be in any format recognized by astropy.')

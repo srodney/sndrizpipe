@@ -11,7 +11,7 @@ import stwcs
 
 
 def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
-                 wcsname='SNDRIZZLE', 
+                 wcsname='SNDRIZZLE', refnbright=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  fluxmin=None, fluxmax=None, threshold=4.0,
                  minobj=10, fitgeometry='rscale',
@@ -58,7 +58,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                               fitgeometry=fitgeometry, refcat=refcat,
                               refimage=refim, refxcol=1, refycol=2,
                               refxyunits='degrees', rfluxcol=3,
-                              rfluxunits='mag',
+                              rfluxunits='flux', refnbright=refnbright,
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                               searchrad=searchrad, conv_width=conv_width,
                               threshold=threshold,
@@ -71,8 +71,9 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                 print("OK. Proceeding to update headers.")
                 break
             print("Current tweakreg/imagefind parameters:")
-            printfloat("   rfluxmin = %.1f  # min mag for refcat sources", rfluxmin)
-            printfloat("   rfluxmax = %.1f  # max mag for refcat sources", rfluxmax)
+            printfloat("   refnbright = %i  # number of brightest refcat sources to use", refnbright)
+            printfloat("   rfluxmin = %.1f  # min flux for refcat sources", rfluxmin)
+            printfloat("   rfluxmax = %.1f  # max flux for refcat sources", rfluxmax)
             printfloat("   searchrad  = %.1f  # matching search radius (arcsec)", searchrad )
             printfloat("   fluxmin    = %.1f  # min total flux for detected sources", fluxmin )
             printfloat("   fluxmax    = %.1f  # max total flux for detected sources", fluxmax )
@@ -89,7 +90,8 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                 except : 
                     print('Must use the "parname = value" syntax. Try again') 
                     continue
-                if parname=='rfluxmin' : rfluxmin=float( value )
+                if parname=='refnbright' : refnbright=int( value )
+                elif parname=='rfluxmin' : rfluxmin=float( value )
                 elif parname=='rfluxmax' : rfluxmax=float( value )
                 elif parname=='searchrad' : searchrad=float( value )
                 elif parname=='fluxmin' : fluxmin=float( value )
@@ -103,7 +105,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                       see2dplot=False, residplot='No plot', 
                       fitgeometry=fitgeometry, refcat=refcat, refimage=refim,
                       refxcol=1, refycol=2, refxyunits='degrees', 
-                      rfluxcol=3, rfluxunits='mag',
+                      refnbright=refnbright, rfluxcol=3, rfluxunits='mag',
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
                       separation=0.0, tolerance=1.5, minobj=10,
@@ -154,9 +156,9 @@ def toFirstim( fltlist, searchrad=1.0,
 
 
 
-def toRefim( filelist, refim, refcat=None,
-             rfluxmax=27, rfluxmin=18, searchrad=1.0,
-             fluxmin=None, fluxmax=None, threshold=4.0,
+def toRefim( filelist, refim, refcat=None, refnbright=None,
+             rfluxmax=None, rfluxmin=None, searchrad=1.5,
+             fluxmin=None, fluxmax=None, threshold=5.0,
              minobj=10,
              interactive=False, clobber=False, debug=False ):
     """Run tweakreg on a list of flt or drz images to bring them into
@@ -179,6 +181,7 @@ def toRefim( filelist, refim, refcat=None,
     wcsname = RunTweakReg(
         filelist, refim=refim, refcat=refcat,
         wcsname='REFIM:%s'%os.path.basename(refim),
+        refnbright=refnbright,
         rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
         fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
         minobj=minobj,
