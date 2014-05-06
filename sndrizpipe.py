@@ -135,7 +135,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # copy pristine flt files into epoch sub-directories
     if dosetup :
         if verbose :
-            print("SNDRIZZLE : (1) SETUP : copying flt files into subdirs")
+            print("sndrizpipe : (1) SETUP : copying flt files into subdirs")
         exposures.copy_to_epochdirs( explist,
                               onlyfilters=onlyfilters, onlyepochs=onlyepochs,
                               verbose=verbose, clobber=clobber )
@@ -149,7 +149,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # Construct the WCS reference image
     if dorefim :
         if verbose :
-            print("SNDRIZZLE : (2) REFIM : Constructing WCS ref image.")
+            print("sndrizpipe : (2) REFIM : Constructing WCS ref image.")
         if os.path.exists( refim ) and clobber :
             os.remove( refim )
         if os.path.exists( refim ) :
@@ -174,7 +174,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 explistRIvisfind = [ exp for exp in explist_all
                         if (exp.epoch==refepoch and exp.filter==reffilter) ]
                 visits = [exp.visit for exp in explistRIvisfind ]
-                exp_times = [exp.exposure_time for exp in explistRIvisfind ]
+                exp_times = np.array([exp.exposure_time
+                                      for exp in explistRIvisfind ])
                 unique_visits = np.unique( visits )
                 if len(unique_visits)==1:
                     refvisit = unique_visits[0]
@@ -220,7 +221,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # is a drz_sci.fits file in the native rotation.
     if dodriz1 :
         if verbose :
-            print("SNDRIZZLE : (3) DRIZ1 : first astrodrizzle pass.")
+            print("sndrizpipe : (3) DRIZ1 : first astrodrizzle pass.")
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
@@ -276,7 +277,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # Then use tweakback to propagate that back into the flt files
     if doreg : 
         if verbose :
-            print("SNDRIZZLE : (4) REG : running tweakreg.")
+            print("sndrizpipe : (4) REG : running tweakreg.")
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
@@ -317,7 +318,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # combining all flt files with the same filter and epoch.
     if dodriz2 :
         if verbose :
-            print("SNDRIZZLE : (5) DRIZ2 : second astrodrizzle pass.")
+            print("sndrizpipe : (5) DRIZ2 : second astrodrizzle pass.")
         for FEgroup in FEgrouplist :
             explistFE = [ exp for exp in explist if exp.FEgroup == FEgroup ]
             thisepoch = explistFE[0].epoch
@@ -355,7 +356,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # Define a template epoch for each filter and subtract it from the other epochs
     if dodiff :
         if verbose :
-            print("SNDRIZZLE : (6) DIFF : subtracting template images.")
+            print("sndrizpipe : (6) DIFF : subtracting template images.")
         for filter in filterlist :
             if onlyfilters and filter not in onlyfilters : continue
             template = None
