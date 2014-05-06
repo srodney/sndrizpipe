@@ -49,7 +49,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
     return(explist)
 
-def read_epochs( explist, epochlistfile, onlyfilters=None ):
+def read_epochs( explist, epochlistfile ):
     """Read the epoch sorting scheme from epochlistfile, apply it to
     the Exposures in explist (i.e. update their .epoch parameters) and
     return the modified explist.
@@ -61,8 +61,6 @@ def read_epochs( explist, epochlistfile, onlyfilters=None ):
     rootnamelist = epochtable['rootname'].tolist()
     epochlist = epochtable['epoch']
     for exp in explist :
-        if onlyfilters and exp.filter not in onlyfilters :
-            continue
         try:
             iexp = rootnamelist.index(exp.rootname)
         except ValueError:

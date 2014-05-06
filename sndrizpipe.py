@@ -93,19 +93,22 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
-    explist = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
+    explist_all = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
     
     if not epochlistfile :
-        epochlistfile =  "%s_epochs.txt"%explist[0].outroot
+        epochlistfile =  "%s_epochs.txt"%explist_all[0].outroot
     if os.path.exists( epochlistfile ) :
         print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        exposures.read_epochs( explist, epochlistfile, onlyfilters=onlyfilters )
+        exposures.read_epochs( explist_all, epochlistfile )
+        exposures.print_epochs( explist_all, outfile=None,
+                                verbose=verbose, clobber=False,
+                                onlyfilters=None, onlyepochs=None )
     else :
-        exposures.define_epochs( explist, epochspan=epochspan,
-                            mjdmin=mjdmin, mjdmax=mjdmax )
-    exposures.print_epochs( explist, outfile=epochlistfile,
-                            verbose=verbose, clobber=clobber,
-                            onlyfilters=onlyfilters, onlyepochs=onlyepochs )
+        exposures.define_epochs( explist_all, epochspan=epochspan,
+                                 mjdmin=mjdmin, mjdmax=mjdmax )
+        exposures.print_epochs( explist_all, outfile=epochlistfile,
+                                verbose=verbose, clobber=False,
+                                onlyfilters=None, onlyepochs=None )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )
@@ -117,8 +120,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
     # reduce the working exposure list to contain only those exposures
     # that we actually want to process
-    new_explist = []
-    for exp in explist:
+    explist = []
+    for exp in explist_all:
         if exp.epoch==-1 or not exp.ontarget :
             continue
         if onlyfilters and exp.filter not in onlyfilters :
@@ -126,8 +129,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         elif onlyepochs and exp.epoch not in onlyepochs :
             continue
         else:
-            new_explist.append( exp )
-    explist = new_explist
+            explist.append( exp )
 
     # STAGE 1 :
     # copy pristine flt files into epoch sub-directories
@@ -139,7 +141,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                               verbose=verbose, clobber=clobber )
 
     FEVgrouplist = sorted( np.unique( [ exp.FEVgroup for exp in explist ] ) )
-    FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )     
+    FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
     epochlist = sorted( np.unique([ exp.epoch for exp in explist ] ) )
 
@@ -169,7 +171,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # if refvisit is not set, then find the maximum depth visit and use that
             if not refvisit :
                 visits, exp_times, visit_depth = np.array( ([], [], []) )
-                for exp in explist:
+                for exp in explist_all:
                     if (exp.epoch != refepoch) and (exp.filter != reffilter):
                         continue
                     visits    = np.append( visits, exp.visit )
@@ -178,13 +180,15 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 for u in unique_visits:
                     ind = np.where( visits == u )
                     visit_depth = np.append( visit_depth, np.sum(exp_times[ind]) )
+                if len(unique_visits)<1:
+                    raise exceptions.RuntimeError(
+                        "No visits satisfy the refimage requirements:"+\
+                        "  filter = %s\n  epoch = %s"%(reffilter,refepoch) )
                 max_ind  = np.argmax( visit_depth )
                 refvisit = unique_visits[max_ind]
-            
-            
             refvisit = refvisit.upper()
             
-            explistRI = sorted( [ exp for exp in explist if exp.epoch==refepoch
+            explistRI = sorted( [ exp for exp in explist_all if exp.epoch==refepoch
                                   and exp.filter==reffilter and exp.visit==refvisit ] )
 
             refdrzdir = os.path.dirname( refim )
@@ -205,7 +209,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             os.rename(refimsci,refim)
             os.chdir(topdir)
             
-            print refvisit
 
     # STAGE 3 :
     # Drizzle together each drizzle group (same epoch, visit and
