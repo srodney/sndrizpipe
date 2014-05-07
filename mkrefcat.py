@@ -1,8 +1,37 @@
 #! /usr/bin/env python
 # S.Rodney 2014.05.06
 
+def writeDS9reg( catalog, regfile, color='green', shape='diamond',
+                 linewidth=1 ):
+    """ Write out a DS9 region file from the given catalog
+    catalog may be a file name or an astropy table object.
+    """
+    from astropy.coordinates import ICRS
+    from astropy import units as u
+    from astropy.io import ascii
+
+    if isinstance(catalog,basestring) :
+        catalog = ascii.read( catalog )
+
+    fout = open(regfile,'w')
+    print>>fout,"# Region file format: DS9 version 5.4"
+    print>>fout,'global color=%s font="times 16 bold" select=1 edit=1 move=0 delete=1 include=1 fixed=0 width=%i'%(color,linewidth)
+
+    for row in catalog :
+        RA = row['RA']
+        DEC = row['DEC']
+        if ':' in str(RA) :
+            coord = ICRS( ra=RA,dec=DEC, unit=(u.hour,u.degree) )
+        else :
+            coord = ICRS( ra=RA, dec=DEC, unit=(u.degree,u.degree) )
+
+        xstr  = coord.ra.to_string( unit=u.hour,decimal=False, pad=True,sep=':', precision=2 )
+        ystr  = coord.dec.to_string( unit=u.degree, decimal=False, pad=True, alwayssign=True, sep=':', precision=1 )
+        print>>fout,'point  %s  %s  # point=%s'%( xstr, ystr, shape )
+    fout.close()
+
 def convertToRefcat( incatfile, refcatfile, fluxcol=None,
-                     clobber=False, verbose=False ):
+                     ds9regfile=False, clobber=False, verbose=False ):
     """ Read in the catalog incatfile and write out as a tweakreg reference
     catalog called refcatfile.
     The file incatfile may be in any of the formats recognized by the
@@ -57,6 +86,8 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None,
             incat.rename_column( incol, outcol )
 
     incat.write( refcatfile, format='ascii.commented_header' )
+    if ds9regfile :
+        writeDS9reg( incat, ds9regfile )
 
 def main():
     import argparse
@@ -66,15 +97,24 @@ def main():
                     '(Requires astropy)' )
 
     # Required positional argument
-    parser.add_argument('incatfile', help='Input catalog. May be in any format recognized by astropy.')
-    parser.add_argument('refcatfile', help='Output reference catalog file name.')
-    parser.add_argument('--fluxcol', default=None, help='Name of the input catalog column containing fluxes or magnitudes, to be used by tweakreg for limiting detected source lists.')
-    parser.add_argument('--clobber', default=False, action='store_true', help='Clobber existing reference catalog if it exists. [False]')
-    parser.add_argument('--verbose', default=False, action='store_true', help='Turn on verbose output. [False]')
+    parser.add_argument('incatfile', help='Input catalog. May be in any format'
+                                          'recognized by astropy.')
+    parser.add_argument('refcatfile', help='Output reference catalog file name')
+    parser.add_argument('--fluxcol', default=None,
+                        help='Name of the input catalog column containing '
+                             'fluxes or magnitudes, to be used by tweakreg '
+                             'for limiting detected source lists.')
+    parser.add_argument('--ds9reg', type=str, metavar='X.reg',
+                        help='Write out a ds9 region file.' )
+    parser.add_argument('--clobber', default=False, action='store_true',
+                        help='Clobber existing reference catalog if it exists. [False]')
+    parser.add_argument('--verbose', default=False, action='store_true',
+                        help='Turn on verbose output. [False]')
 
     argv = parser.parse_args()
     convertToRefcat( argv.incatfile, argv.refcatfile, fluxcol=argv.fluxcol,
-                     clobber=argv.clobber, verbose=argv.verbose )
+                     ds9regfile=argv.ds9reg, clobber=argv.clobber,
+                     verbose=argv.verbose )
 
 if __name__=='__main__' :
     main()
