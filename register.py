@@ -61,8 +61,8 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                               rfluxunits='flux', refnbright=refnbright,
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                               searchrad=searchrad, conv_width=conv_width,
-                              threshold=threshold,
-                              separation=0.0, tolerance=1.5, minobj=minobj,
+                              threshold=threshold, separation=0.0,
+                              tolerance=searchrad, minobj=minobj,
                               clean=(not (interactive or debug) ),
                               writecat=(interactive or debug) )
             print( "==============================\n sndrizzle.register:\n")
@@ -108,7 +108,7 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
                       refnbright=refnbright, rfluxcol=3, rfluxunits='mag',
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
-                      separation=0.0, tolerance=1.5, minobj=10,
+                      separation=0.0, tolerance=searchrad, minobj=minobj,
                       clean=(not debug) )
     return( wcsname )
 
@@ -130,62 +130,6 @@ def intraVisit( fltlist, fluxmin=None, fluxmax=None, threshold=4.0,
         fltlist, refcat=None, wcsname='INTRAVIS', searchrad=1.0,
         fluxmin=fluxmin, fluxmax=fluxmax, fitgeometry='shift', minobj=minobj,
         threshold=threshold, interactive=interactive,  clobber=clobber )
-    return( wcsname )
-
-
-def toFirstim( fltlist, searchrad=1.0,
-               fluxmin=None, fluxmax=None, threshold=4.0, minobj=10,
-               interactive=False, clobber=False, debug=False ):
-    """ 
-    Run tweakreg on a list of flt images, updating their WCS for
-    alignment with the WCS of the first file in the list.
-
-    When interactive is True, the user will be presented with the
-    tweakreg plots (2d histogram, residuals, etc) to review, and will
-    be given the opportunity to adjust the tweakreg parameters and
-    re-run.
-    """
-    if debug : import pdb; pdb.set_trace() 
-    firstimfile = os.path.basename(fltlist[0])
-    wcsname = RunTweakReg(
-        fltlist, refcat=None, wcsname='FIRSTIM:%s'%firstimfile,
-        searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
-        threshold=threshold, interactive=interactive, minobj=minobj,
-        clobber=clobber, debug=debug )
-    return( wcsname )
-
-
-
-def toRefim( filelist, refim, refcat=None, refnbright=None,
-             rfluxmax=None, rfluxmin=None, searchrad=1.5,
-             fluxmin=None, fluxmax=None, threshold=5.0,
-             minobj=10,
-             interactive=False, clobber=False, debug=False ):
-    """Run tweakreg on a list of flt or drz images to bring them into
-    alignment with the given reference image, refim.  Optionally a
-    refcat can be provided to define the absolute astrometric system
-    and narrow down the list of allowed sources for matching.
-
-    refim must be a CR-cleaned, drizzled image product.
-    
-    refcat must be a catalog with RA,DEC,MAG in columns 1,2,3.
-
-    When interactive is True, the user will be presented with the
-    tweakreg plots (2d histogram, residuals, etc) to review, and will
-    be given the opportunity to adjust the tweakreg parameters and
-    re-run.
-
-    """
-    if debug : import pdb; pdb.set_trace()
-    
-    wcsname = RunTweakReg(
-        filelist, refim=refim, refcat=refcat,
-        wcsname='REFIM:%s'%os.path.basename(refim),
-        refnbright=refnbright,
-        rfluxmax=rfluxmax, rfluxmin=rfluxmin, searchrad=searchrad,
-        fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
-        minobj=minobj,
-        interactive=interactive, clobber=clobber, debug=debug )
     return( wcsname )
 
 
@@ -226,6 +170,7 @@ def printfloat( fmtstr, value ):
 
 def mkSourceCatalog( imfile, computesig=True, skysigma=0,
                      threshold=4.0, fluxmin=None, fluxmax=None ) :
+    """NOT FUNCTIONAL"""
     import pywcs
     from drizzlepac import catalogs
 

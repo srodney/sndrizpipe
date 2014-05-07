@@ -83,7 +83,8 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     # define the default astrodrizzle parameters for this camera
     # Note that we fake the number of exposures to be 2, so that we get
     # consistent default pixel scales across all epochs, regardless of the
-    # varying number of exposures per epoch.
+    # varying number of exposures per epoch.  This can of course be
+    # over-ridden by the user specifying pixscale and pixfrac.
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=2 )

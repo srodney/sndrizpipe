@@ -119,6 +119,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         refimbasename = '%s_wcsref_sci.fits'%(outroot)
         refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
 
+    if refcat : refcat = os.path.abspath(refcat)
+
     # reduce the working exposure list to contain only those exposures
     # that we actually want to process
     explist = []
@@ -204,6 +206,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 refsrcdir = os.path.abspath( fltdir )
                 shutil.copy( os.path.join( refsrcdir, fltfile ), refdrzdir )
             fltlistRI = [ exp.filename for exp in explistRI ]
+
             refimroot = '%s_wcsref'%outroot
             os.chdir( refdrzdir )
             refimsci, refimwht = drizzle.secondDrizzle(
@@ -212,6 +215,26 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 pixscale=pixscale, pixfrac=pixfrac,
                 clobber=clobber, verbose=verbose, debug=debug  )
             os.rename(refimsci,refim)
+
+            if refcat :
+                if verbose : print( " Registering reference image"
+                                    "%s to ref catalog %s"%(refimsci, refcat))
+                wcsname = register.RunTweakReg(
+                    fltlistRI, refim=refim, refcat=refcat,
+                    wcsname='REFCAT:%s'%os.path.basename(refcat),
+                    fitgeometry='shift', searchrad=searchrad,
+                    refnbright=refnbright, rfluxmax=rfluxmax,
+                    rfluxmin=rfluxmin, fluxmin=fluxmin, fluxmax=fluxmax,
+                    threshold=threshold, minobj=minobj,
+                    interactive=interactive, clobber=clobber, debug=debug )
+                refimsci, refimwht = drizzle.secondDrizzle(
+                    fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
+                    imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                    pixscale=pixscale, pixfrac=pixfrac,
+                    clobber=True, verbose=verbose, debug=debug  )
+                os.remove(refim)
+                os.rename(refimsci,refim)
+
             os.chdir(topdir)
             
 
@@ -251,13 +274,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
 
-            # TODO : Update the WCS of the refim so that it matches the reference catalog
-            #if refcat :
-            #    if verbose : print( " Registering reference image %s  to ref catalog %s"%(refim,refcat))
-            #    register.toCatalog( refim, refcat, refim, refnbright=refnbright, rfluxmax=rfluxmax, rfluxmin=rfluxmin,
-            #                        searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax, threshold=threshold,
-            #                        interactive=interactive, debug=debug )
-
             os.chdir( topdir )
 
 
@@ -292,8 +308,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             outsciFEV = '%s_%s_sci.fits'%(outrootFEV,explistFEV[0].drzsuffix)
 
             refimpath = os.path.abspath(refim)
-            if refcat : refcatpath = os.path.abspath(refcat)
-            else : refcatpath = None
 
             os.chdir( epochdir )
             if not os.path.exists( outsciFEV ) :
@@ -301,8 +315,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
             # register to the ref image and ref catalog
             origwcs = pyfits.getval( outsciFEV,'WCSNAME').strip()
-            wcsname = register.toRefim(
-                outsciFEV, refim=refimpath, refcat=refcatpath,
+            wcsname = register.RunTweakReg(
+                outsciFEV, wcsname='REFIM:%s'%os.path.basename(refim),
+                refim=refimpath, refcat=refcat,
                 searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
                 threshold=threshold, minobj=minobj,
                 refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
