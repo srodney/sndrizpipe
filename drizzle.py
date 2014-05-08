@@ -148,14 +148,18 @@ def getdrizpar( instrument, detector, nexposures=None ) :
                 pixscale=0.09
             elif nexposures >= 3 :
                 pixscale=0.06
-            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':200,
+            # drizbits DQ flags allowed as OK :
+            # 8192 = up-the-ramp CR; 512 = bad flat (blobs); 64 = warm pixel
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
                      'drizbits':'8192,512,64'} )
         elif detector.startswith('UV'):
             if nexposures == 1 :
                 pixscale=0.04
             elif nexposures >= 2 :
                 pixscale=0.03
-            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':230,
+            # drizbits DQ flags allowed as OK :
+            # 64 = warm pixel; 32 = hot pix CTE tail
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
                      'drizbits':'64,32' } )
     elif instrument=='ACS': 
         if detector.startswith('WFC'):
@@ -165,7 +169,9 @@ def getdrizpar( instrument, detector, nexposures=None ) :
                 pixscale=0.04
             elif nexposures >= 3 :
                 pixscale=0.03
-            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':300,
+            # drizbits DQ flags allowed as OK :
+            # 64 = warm pixel; 32 = hot pix CTE tail
+            return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
                      'drizbits':'64,32'} )
     else :
         raise exceptions.RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )

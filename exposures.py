@@ -27,7 +27,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
         explist = get_explist( explist )
 
     mjdlist = np.array( [ exp.mjd for exp in explist ] )
-    visitlist = np.array( [ exp.visit for exp in explist ] )
+    pidvisitlist = np.array( [ exp.pidvisit for exp in explist ] )
     epochlist = np.zeros( len(mjdlist) )
 
     thisepochmjd0 = mjdlist.min()
@@ -35,16 +35,16 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     for imjd in mjdlist.argsort() :
         thismjd = mjdlist[imjd]
         exp = explist[imjd]
-        if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
-        elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
-        elif thismjd > thisepochmjd0+epochspan :
-            thisepoch += 1
-            thisepochmjd0 = thismjd
-        for ithisvis in np.where( visitlist == visitlist[imjd] )[0] :
+        for ithisvis in np.where( pidvisitlist == pidvisitlist[imjd] )[0] :
             if exp.epoch == -1 or not exp.ontarget :
                 epochlist[ ithisvis ] = -1
                 explist[ ithisvis ].epoch = -1
             else :
+                if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
+                elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
+                elif thismjd > thisepochmjd0+epochspan :
+                    thisepoch += 1
+                    thisepochmjd0 = thismjd
                 epochlist[ ithisvis ] = thisepoch
                 explist[ ithisvis ].epoch = thisepoch
     # Sort the exposure list by epoch, then filter, then visit
@@ -152,9 +152,11 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
 
 
 
-def checkonimage(exp,checkradec,verbose=False, debug=False):
+def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     """Check if the given ra,dec falls anywhere within the
     science frame of the image that defines the given Exposure object.
+    You can extend the effective size of the science frame by <buffer>
+    pixels.
     """
     import pyfits
     import pywcs
@@ -168,8 +170,8 @@ def checkonimage(exp,checkradec,verbose=False, debug=False):
     for hdr in exp.headerlist :
         expwcs = pywcs.WCS( hdr, hdulist )
         ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
-        if ix<0 or ix>expwcs.naxis1 : continue
-        if iy<0 or iy>expwcs.naxis2 : continue
+        if ix<-buffer or ix>expwcs.naxis1+buffer : continue
+        if iy<-buffer or iy>expwcs.naxis2+buffer : continue
         onimage=True
         break
 
@@ -183,7 +185,24 @@ class Exposure( object ):
     them into groups by epoch and band for astrodrizzling.
     """
 
-    def __init__( self, filename, outroot='TARGNAME', targetradec=[None,None] ) :
+    def __init__( self, initstr, outroot='TARGNAME',
+                  targetradec=[None, None] ) :
+        if initstr.endswith('.fits') :
+            self.initFromFile( initstr, outroot=outroot,
+                               targetradec=targetradec )
+        else :
+            self.initFromStr( initstr, outroot=outroot,
+                              targetradec=targetradec )
+
+
+    def initFromStr(self, fltstr, outroot='TARGNAME', targetradec=[None,None] ):
+        """ Initialize an Exposure object from a string. Specifically,
+        a single row from the _epochs.txt file.
+        """
+
+    def initFromFile(self, filename, outroot='TARGNAME', targetradec=[None,None] ):
+        """ Initialize an Exposure object from an flt.fits file.
+        """
         import pyfits
         import os
         from math import ceil
@@ -227,6 +246,7 @@ class Exposure( object ):
         # Visit name and exposure number (in the orbit sequence), 
         # as defined in APT
         self.visit = self.linenum.split('.')[0]
+        self.pidvisit = '%i.%s'%(self.pid, self.visit)
         self.expnum = int( self.linenum.split('.')[1] )
 
         if self.header['PATTERN1'] == 'NONE' :
@@ -257,7 +277,9 @@ class Exposure( object ):
         # if target ra,dec provided, check that the source is on the image
         self.ontarget=True
         if targetradec[0] is not None and targetradec[1] is not None:
-            if not checkonimage(self,targetradec):
+            if self.camera=='ACS-WFC': buffer=50
+            else : buffer=20
+            if not checkonimage(self,targetradec,buffer=buffer):
                 self.epoch=-1
                 self.ontarget = False
 
