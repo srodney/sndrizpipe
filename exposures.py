@@ -131,12 +131,6 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
     if type(onlyepochs) in [str,int,float]  :
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
-    if clobber :
-        if verbose:
-            print( "Wiping away existing epoch dirs.")
-        for exp in explist :
-            if os.path.isdir( exp.epochdir ) :
-                shutil.rmtree( exp.epochdir )
 
     for exp in explist :
         # only copy files for the given filter and epoch
@@ -147,8 +141,15 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
             continue
         if not os.path.isdir( exp.epochdir ):
             os.makedirs( exp.epochdir )
+        newfilename = os.path.join( exp.epochdir,
+                                    os.path.basename(exp.filename) )
+        if clobber :
+            if verbose:
+                print( "Wiping away existing flt file %s"%newfilename)
+            if os.path.exists( newfilename ):
+                os.remove( newfilename )
         if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
-        shutil.copy( exp.filepath, exp.epochdir )
+        shutil.copy( exp.filepath, newfilename )
 
 
 

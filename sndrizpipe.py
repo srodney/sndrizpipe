@@ -47,7 +47,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # construct a ref image
               dorefim=False,
               # Single Visit tweakreg/drizzle pass : 
-              dodriz1=False, drizcr=False, intravisitreg=False,
+              dodriz1=False, drizcr=1, intravisitreg=False,
               # Register to a given image or  epoch, visit and filter
               doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
               # Drizzle registered flts by epoch and filter 
@@ -151,12 +151,16 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # STAGE 2 :
     # Construct the WCS reference image
     if dorefim :
+        refimclobber = clobber and (reffilter or refepoch or refvisit)
         if verbose :
             print("sndrizpipe : (2) REFIM : Constructing WCS ref image.")
-        if os.path.exists( refim ) and clobber :
+        if os.path.exists( refim ) and refimclobber :
             os.remove( refim )
         if os.path.exists( refim ) :
             print("%s already exists.  Not clobbering."%refim)
+            if clobber :
+                print("To clobber and remake the ref image, you must provide "
+                      "at least one of --reffilter, --refepoch, --refvisit")
         else :
             refdrzdir = os.path.dirname( refim )
             if verbose :
@@ -492,9 +496,11 @@ def mkparser():
 
     drizpar = parser.add_argument_group( "Settings for astrodrizzle and subtraction stages")
     drizpar.add_argument('--drizcr', metavar='N', type=int,
-                         help='Run a fresh CR rejection step to replace existing flt CR flags.'+\
-                         '\nUse --drizcr 1 to run CR rejection only within the visit.'+\
-                         '\nUse --drizcr 2 to also flag CRs at the multi-visit drizzle stage.', default=False )
+                         help='Astrodrizzle cosmic ray rejection stage.'
+                         "\n0 : don't do any new CR rejection "
+                         '\n1 : run CR rejection only within the visit. [the default]'
+                         '\n2 : also flag CRs at the multi-visit drizzle stage.',
+                         default=1 )
     drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
