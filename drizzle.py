@@ -41,7 +41,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
-        updatewcs=False, wcskey=wcskey, build=False, resetbits=int(driz_cr and 4096),
+        updatewcs=False, wcskey=wcskey, build=False, resetbits=int((driz_cr and docombine) and 4096),
         restore=True, preserve=True, overwrite=False, clean=True,
         median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
         combine_type='iminmed',

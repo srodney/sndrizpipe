@@ -180,10 +180,10 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 #visits, exp_times, visit_depth = np.array( ([], [], []) )
                 explistRIvisfind = [ exp for exp in explist_all
                         if (exp.epoch==refepoch and exp.filter==reffilter) ]
-                visits = [exp.visit for exp in explistRIvisfind ]
+                pidvisits = [exp.pidvisit for exp in explistRIvisfind ]
                 exp_times = np.array([exp.exposure_time
                                       for exp in explistRIvisfind ])
-                unique_visits = np.unique( visits )
+                unique_visits = np.unique( pidvisits )
                 if len(unique_visits)==1:
                     refvisit = unique_visits[0]
                 elif len(unique_visits)<1:
@@ -191,7 +191,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                         "No visits satisfy the refimage requirements:\n"+\
                         "  filter = %s     epoch = %s"%(reffilter,refepoch) )
                 else :
-                    visindices = [ np.where(np.char.equal(visits,vis))[0]
+                    visindices = [ np.where(np.char.equal(pidvisits,vis))[0]
                                    for vis in unique_visits ]
                     visit_depth = np.array( [ np.sum(exp_times[ivis])
                                               for ivis in visindices ] )
@@ -200,7 +200,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             refvisit = refvisit.upper()
             
             explistRI = sorted( [ exp for exp in explist_all if exp.epoch==refepoch
-                                  and exp.filter==reffilter and exp.visit==refvisit ] )
+                                  and exp.filter==reffilter and exp.pidvisit==refvisit ] )
 
             refdrzdir = os.path.dirname( refim )
             if not os.path.isdir( refdrzdir ) :
@@ -274,6 +274,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 register.intraVisit(
                     fltlistFEV, fluxmin=fluxmin, fluxmax=fluxmax, minobj=minobj,
                     threshold=threshold, interactive=interactive, debug=debug )
+            import pdb; pdb.set_trace()
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
@@ -495,12 +496,11 @@ def mkparser():
     regpar.add_argument('--minobj', metavar='X', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
 
     drizpar = parser.add_argument_group( "Settings for astrodrizzle and subtraction stages")
-    drizpar.add_argument('--drizcr', metavar='N', type=int,
+    drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
                          help='Astrodrizzle cosmic ray rejection stage.'
                          "\n0 : don't do any new CR rejection "
                          '\n1 : run CR rejection only within the visit. [the default]'
-                         '\n2 : also flag CRs at the multi-visit drizzle stage.',
-                         default=1 )
+                         '\n2 : also flag CRs at the multi-visit drizzle stage.')
     drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)

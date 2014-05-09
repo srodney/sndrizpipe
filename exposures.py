@@ -48,7 +48,8 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
                 epochlist[ ithisvis ] = thisepoch
                 explist[ ithisvis ].epoch = thisepoch
     # Sort the exposure list by epoch, then filter, then visit
-    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
+                                   exp.mjd) )
     return(explist)
 
 def read_epochs( explist, epochlistfile ):
@@ -68,8 +69,9 @@ def read_epochs( explist, epochlistfile ):
         except ValueError:
             continue
         exp.epoch = epochlist[iexp]
-    # Sort the exposure list by epoch, then filter, then visit
-    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
+    # Sort the exposure list by epoch, filter, visit, and MJD
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
+                                   exp.mjd ) )
     return(explist)
 
 def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilters=None, onlyepochs=None ):
@@ -89,7 +91,8 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
         fout = open( outfile, 'a' )
 
     # Sort the exposure list by epoch, then filter, then visit
-    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.visit) )
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
+                                   exp.mjd) )
 
     header = '#%9s %5s %3s %3s %6s %5s %7s '%(
             'rootname','pid','vis','exp','filter','epoch','mjd' )
@@ -292,12 +295,12 @@ class Exposure( object ):
     @property
     def FEVgroup( self ):
         """each exposure belongs to a single 'FEV group', which comprises all
-        the images from the same Filter, same Epoch, and same Visit;
+        the images from the same Filter, same Epoch, and same (pid).Visit;
         suitable for combination with astrodrizzle in the first
         (pre-registration) drizzle pass, possibly including the CR
         rejection step.
         """
-        return( '%s_e%02i_v%s'%( self.filter, self.epoch, self.visit ) )
+        return( '%s_e%02i_v%s'%( self.filter, self.epoch, self.pidvisit ) )
 
     @property
     def FEgroup( self ):
