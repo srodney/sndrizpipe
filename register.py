@@ -6,62 +6,82 @@ import pyfits
 # import exceptions
 
 from stsci import tools
-from drizzlepac import tweakreg, astrodrizzle
+from drizzlepac import tweakreg
 import stwcs
+import exposures
+import exceptions
 
 
-def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
-                 wcsname='SNDRIZZLE', refnbright=None,
+def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
+                 wcsname='SNDRIZPIPE', refnbright=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  fluxmin=None, fluxmax=None, threshold=4.0,
                  minobj=10, fitgeometry='rscale',
                  interactive=False, clobber=False, debug=False ):
+    """Run tweakreg on a set of flt files or drz files."""
     if debug : import pdb; pdb.set_trace()
+    from astropy.io import ascii
 
     #convert the input list into a useable list of images for astrodrizzle
-    if type( fltfilestr ) == str :
-        fltlist=tools.parseinput.parseinput(fltfilestr)[0]
-    else : 
-        fltlist = fltfilestr
-        fltfilestr = ','.join( fltlist ).strip(',')
+    if type( files ) == str :
+        filelist=tools.parseinput.parseinput(files)[0]
+    else :
+        filelist = files
+        files = ','.join( filelist ).strip(',')
+    if len(filelist)==0 :
+        raise exceptions.RuntimeError(
+            "List of input files has no real files: %s"%str(files))
 
     # pre-clean any existing WCS header info
-    # clearAltWCS( fltlist )       
+    # clearAltWCS( filelist )
 
-    hdr1 = pyfits.getheader( fltlist[0] )
+    hdr1 = pyfits.getheader( filelist[0] )
     instrument = hdr1['INSTRUME']
     detector   = hdr1['DETECTOR']
     camera = instrument + '-' + detector
-    if camera == 'ACS-WFC' : 
-        conv_width = 3.5
+    pixscale = getpixscale( filelist[0] )
+    if camera == 'ACS-WFC' :
+        conv_width = 3.5 * 0.05 / pixscale
     elif camera == 'WFC3-UVIS' : 
-        conv_width = 3.5
+        conv_width = 3.5 * 0.04 / pixscale
     elif camera == 'WFC3-IR' : 
-        conv_width = 2.5
+        conv_width = 2.5 * 0.13 / pixscale
     else : 
         conv_width = 2.5
 
-    # check first if the WCS wcsname already exists in the first flt image
+    # check first if the WCS wcsname already exists in the first image
     wcsnamelist = [ hdr1[k] for k in hdr1.keys() if k.startswith('WCSNAME') ]
     if wcsname in wcsnamelist and not clobber :
         print(
-            "WCSNAME %s already exists in %s"%(wcsname,fltlist[0]) +
+            "WCSNAME %s already exists in %s"%(wcsname,filelist[0]) +
             "so I'm skipping over this tweakreg step." +
             "Re-run with clobber=True if you really want it done." )
         return( wcsname )
 
+    if refcat :
+        refCatalog = ascii.read( refcat )
+        rfluxcol, rfluxunits = None, None
+        if len(refCatalog.columns)>2 :
+            for icol in range(len(refCatalog.columns)) :
+                if 'flux' in refCatalog.colnames[icol].lower():
+                    rfluxcol = icol+1
+                    rfluxunits = 'flux'
+                elif 'mag' in refCatalog.colnames[icol].lower():
+                    rfluxcol = icol+1
+                    rfluxunits = 'mag'
+
     if interactive : 
         while True : 
             print( "sndrizzle.register:  Running a tweakreg loop interactively.")
-            tweakreg.TweakReg(fltfilestr, updatehdr=False, wcsname='TWEAK', 
+            tweakreg.TweakReg(files, updatehdr=False, wcsname='TWEAK',
                               see2dplot=True, residplot='both', 
                               fitgeometry=fitgeometry, refcat=refcat,
                               refimage=refim, refxcol=1, refycol=2,
-                              refxyunits='degrees', rfluxcol=3,
-                              rfluxunits='flux', refnbright=refnbright,
+                              refxyunits='degrees', rfluxcol=rfluxcol,
+                              rfluxunits=rfluxunits, refnbright=refnbright,
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                               searchrad=searchrad, conv_width=conv_width,
-                              threshold=threshold, separation=0.0,
+                              threshold=threshold, separation=0,
                               tolerance=searchrad, minobj=minobj,
                               clean=(not (interactive or debug) ),
                               writecat=(interactive or debug) )
@@ -101,14 +121,14 @@ def RunTweakReg( fltfilestr='*fl?.fits', refcat=None, refim=None,
 
     print( "==============================\n sndrizzle.register:\n")
     print( "  Final tweakreg run for updating headers.")
-    tweakreg.TweakReg(fltfilestr, updatehdr=True, wcsname=wcsname,
+    tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       see2dplot=False, residplot='No plot', 
                       fitgeometry=fitgeometry, refcat=refcat, refimage=refim,
                       refxcol=1, refycol=2, refxyunits='degrees', 
-                      refnbright=refnbright, rfluxcol=3, rfluxunits='mag',
+                      refnbright=refnbright, rfluxcol=rfluxcol, rfluxunits=rfluxunits,
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
-                      separation=0.0, tolerance=searchrad, minobj=minobj,
+                      separation=0, tolerance=searchrad, minobj=minobj,
                       clean=(not debug) )
     return( wcsname )
 
@@ -209,4 +229,59 @@ AttributeError: 'WCS' object has no attribute 'extname'
         fluxmin=fluxmin, fluxmax=fluxmax, conv_width=conv_width )
     return( imcat )
 
+
+def getpixscale( fitsfile, returntuple=False ):
+    """ compute the pixel scale of the reference pixel in arcsec/pix in
+    each direction from the fits header cd matrix.
+    With returntuple=True, return the two pixel scale values along the x and y
+    axes.  For returntuple=False, return the average of the two.
+    """
+    from math import sqrt
+    import pyfits
+
+    if isinstance(fitsfile, basestring) :
+        fitsfile = pyfits.open( fitsfile )
+    if isinstance( fitsfile, pyfits.header.Header ) :
+        hdr = fitsfile
+    elif isinstance( fitsfile, pyfits.hdu.hdulist.HDUList ) :
+        if 'sci' in [ hdu.name.lower() for hdu in fitsfile ] :
+            hdr = fitsfile['SCI'].header
+        else :
+            hdr = fitsfile[0].header
+    elif isinstance( fitsfile, pyfits.hdu.image.PrimaryHDU ) :
+        hdr = fitsfile.header
+    else :
+        raise exceptions.RuntimeError( 'input object type %s is unrecognized')
+
+    # if plate scale is already defined,
+    # (as in the fits standard) just return it
+    if 'CD1_1' in hdr :
+        cd11 = hdr['CD1_1']
+        cd12 = hdr['CD1_2']
+        cd21 = hdr['CD2_1']
+        cd22 = hdr['CD2_2']
+
+        # define the sign based on determinant
+        det = cd11*cd22 - cd12*cd21
+        if det<0 : sgn = -1
+        else : sgn = 1
+
+        if cd12==0 and cd21==0 :
+            # no rotation: x=RA, y=Dec
+            cdelt1 = cd11
+            cdelt2 = cd22
+        else :
+            cdelt1 = sgn*sqrt(cd11**2 + cd12**2)
+            cdelt2 = sqrt(cd22**2 + cd21**2)
+    elif 'CDELT1' in hdr.keys() and (hdr['CDELT1']!=1 and hdr['CDELT2']!=1) :
+        cdelt1 = hdr['CDELT1']
+        cdelt2 = hdr['CDELT2']
+
+    cdelt1 = cdelt1  * 3600.
+    cdelt2 = cdelt2  * 3600.
+
+    if returntuple :
+        return( cdelt1, cdelt2 )
+    else :
+        return( (abs(cdelt1)+abs(cdelt2)) / 2. )
 

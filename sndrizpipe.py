@@ -213,32 +213,30 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
             refimroot = '%s_wcsref'%outroot
             os.chdir( refdrzdir )
-            refimsci, refimwht = drizzle.secondDrizzle(
-                fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
-                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac,
-                clobber=clobber, verbose=verbose, debug=debug  )
-            os.rename(refimsci,refim)
+
+            # drizzle the ref image using firstDrizzle :
+            # (full frame, native rotation, auto-selecting the optimal
+            # pixscale and pixfrac based on number of flts)
+            refdrzsci, refimwht = drizzle.firstDrizzle(
+                fltlistRI, refimroot, driz_cr=drizcr )
 
             if refcat :
+                # Update the WCS header info in the ref image to match the
+                # given reference catalog
                 if verbose : print( " Registering reference image"
-                                    "%s to ref catalog %s"%(refimsci, refcat))
+                                    "%s to ref catalog %s"%(refdrzsci, refcat))
+                if os.path.exists( refim ):  os.remove(refim)
+                shutil.copy( refdrzsci, refim )
                 wcsname = register.RunTweakReg(
-                    fltlistRI, refim=refim, refcat=refcat,
+                    refdrzsci, refim=refim, refcat=refcat,
                     wcsname='REFCAT:%s'%os.path.basename(refcat),
-                    fitgeometry='shift', searchrad=searchrad,
+                    fitgeometry='rscale', searchrad=searchrad,
                     refnbright=refnbright, rfluxmax=rfluxmax,
                     rfluxmin=rfluxmin, fluxmin=fluxmin, fluxmax=fluxmax,
                     threshold=threshold, minobj=minobj,
                     interactive=interactive, clobber=clobber, debug=debug )
-                refimsci, refimwht = drizzle.secondDrizzle(
-                    fltlistRI, refimroot, refimage=None, ra=ra, dec=dec, rot=rot,
-                    imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                    pixscale=pixscale, pixfrac=pixfrac,
-                    clobber=True, verbose=verbose, debug=debug  )
-                os.remove(refim)
-                os.rename(refimsci,refim)
-
+            if os.path.exists( refim ):  os.remove(refim)
+            os.rename(refdrzsci,refim)
             os.chdir(topdir)
             
 
@@ -274,24 +272,12 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 register.intraVisit(
                     fltlistFEV, fluxmin=fluxmin, fluxmax=fluxmax, minobj=minobj,
                     threshold=threshold, interactive=interactive, debug=debug )
-            import pdb; pdb.set_trace()
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
 
             os.chdir( topdir )
 
-
-    if doreg or dodriz2 :
-        if not os.path.exists( refim ):
-            raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
-        else :
-            refim = os.path.abspath( refim )
-
-        # Fix the output  ra and dec center point if not provided by the user.
-        if not ra and not dec :
-            ra = pyfits.getval( refim, "CRVAL1" )
-            dec = pyfits.getval( refim, "CRVAL2" )    
 
     # STAGE 4 :
     # Run tweakreg to register all the single-visit drz images
@@ -300,6 +286,16 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if doreg : 
         if verbose :
             print("sndrizpipe : (4) REG : running tweakreg.")
+
+        refim = os.path.abspath( refim )
+        if not os.path.exists( refim ):
+            raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
+
+        # Fix the output  ra and dec center point if not provided by the user.
+        if not ra and not dec :
+            ra = pyfits.getval( refim, "CRVAL1" )
+            dec = pyfits.getval( refim, "CRVAL2" )
+
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
@@ -312,8 +308,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             outrootFEV = '%s_%s_nat'%(outroot,FEVgroup)
             outsciFEV = '%s_%s_sci.fits'%(outrootFEV,explistFEV[0].drzsuffix)
 
-            refimpath = os.path.abspath(refim)
-
             os.chdir( epochdir )
             if not os.path.exists( outsciFEV ) :
                 exceptions.RuntimeError( "Missing %s."%outsciFEV )
@@ -322,7 +316,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             origwcs = pyfits.getval( outsciFEV,'WCSNAME').strip()
             wcsname = register.RunTweakReg(
                 outsciFEV, wcsname='REFIM:%s'%os.path.basename(refim),
-                refim=refimpath, refcat=refcat,
+                refim=refim, refcat=refcat,
                 searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
                 threshold=threshold, minobj=minobj,
                 refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
@@ -363,7 +357,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 continue
 
             outsciFE, outwhtFE = drizzle.secondDrizzle(
-                fltlistFE, outrootFE, refimage=refim, ra=ra, dec=dec, rot=rot,
+                fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
                 clobber=clobber, verbose=verbose, debug=debug  )
@@ -473,12 +467,18 @@ def mkparser():
     proc.add_argument('--dodiff', action='store_true', help='(6) subtract and mask to make diff images', default=False)
     proc.add_argument('--doall', action='store_true', help='Run all necessary processing stages', default=False)
 
-    sortpar = parser.add_argument_group( "Settings for epoch sorting stage")
+    sortpar = parser.add_argument_group( "(1) Settings for epoch sorting stage")
     sortpar.add_argument('--mjdmin', metavar='0', type=float, help='All observations prior to this date are put into epoch 0.',default=0)
     sortpar.add_argument('--mjdmax', metavar='inf', type=float, help='All observations after this date are put into the last epoch.',default=0)
     sortpar.add_argument('--epochspan', metavar='5', type=float, help='Max number of days spanning a single epoch.',default=5)
 
-    regpar = parser.add_argument_group( "Settings for tweakreg WCS registration stage")
+    refpar = parser.add_argument_group( "(2) Settings for constructing the TweakReg WCS reference image")
+    refpar.add_argument('--refimage', metavar='Z.fits', help='Existing tweakreg ref image. Full path is required.',default='')
+    refpar.add_argument('--refepoch', metavar='X', type=int, help='Use this epoch to define the tweakreg refimage.',default=0)
+    refpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the tweakreg refimage.',default='')
+    refpar.add_argument('--refvisit', metavar='PID.vis', help='Use this PID.visit to define the tweakreg refimage [e.g. 12099.A1]',default='')
+
+    regpar = parser.add_argument_group( "(4) Settings for tweakreg WCS registration stage")
     regpar.add_argument('--interactive', action='store_true', help='Run tweakreg interactively (showing plots)',default=False)
     regpar.add_argument('--intravisitreg', action='store_true', help='Run tweakreg before first drizzle stage to do intra-visit registration.',default=False)
     regpar.add_argument('--refcat', metavar='X.cat', help='Existing source catalog for limiting tweakreg matches.',default='')
@@ -489,13 +489,9 @@ def mkparser():
     regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=0)
     regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=0)
     regpar.add_argument('--refnbright', metavar='X', type=float, help='Number of brightest objects to use from the tweakreg reference catalog.',default=0)
-    regpar.add_argument('--refimage', metavar='Z.fits', help='Existing WCS reference image. Full path is required.',default='')
-    regpar.add_argument('--refepoch', metavar='X', type=int, help='Use this epoch to define the refimage.',default=0)
-    regpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the refimage.',default='')
-    regpar.add_argument('--refvisit', metavar='X', help='Use this visit to define the refimage.',default='')
     regpar.add_argument('--minobj', metavar='X', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
 
-    drizpar = parser.add_argument_group( "Settings for astrodrizzle and subtraction stages")
+    drizpar = parser.add_argument_group( "(5,6) Settings for astrodrizzle and subtraction stages")
     drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
                          help='Astrodrizzle cosmic ray rejection stage.'
                          "\n0 : don't do any new CR rejection "

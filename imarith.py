@@ -24,7 +24,7 @@ def immultiply( image, scalefactor, outfile=None, clobber=False, verbose=False):
         im1head = pyfits.getheader( image )
         im1data = pyfits.getdata( image )
         im1head.update("FLXSCALE",scalefactor,"Flux scaling factor")
-    elif instance( image, ndarray ):
+    elif isinstance( image, ndarray ):
         im1data = image
         im1head = None
     else : 
