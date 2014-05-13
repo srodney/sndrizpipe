@@ -118,15 +118,22 @@ modifications to those FLTs within the subdirs.
 (2) WCS Ref image construction
 --------
 
-The pipeline makes a reference image that sets the WCS for all epochs and
-filters and cameras.  If you are going to have parallel processes
-for the same target then you have to make this reference image first,
-before you start parallel processing, because each parallel process will try
-to generate the same ref image as the first step.
+The pipeline makes a reference image that is subsequently used with
+TweakReg to set a common WCS for all epochs and filters and cameras.
+If you are going to have parallel processes for the same target then
+you have to make this reference image first, before you start parallel
+processing, because each parallel process will try to generate the
+same ref image as the first step.
 
 If you don't specify `--refepoch, --reffilter,` and `--refvisit` then the
 defaults are first epoch, first filter, deepest available visit.
 You can specify 1, 2 or all 3 of those refimage constraints, or none.
+
+When possible, you should choose a filter, epoch and visit that put
+the target near the center of the field, and will provide a deep,
+CR-clean image with lots of sources for registration.  WFC3-IR is
+good when available.  In principle you could use a cutout from a deep
+mosaic image, though at present there is no tool for generating that. 
 
 (3) First drizzle pass
 --------
@@ -196,15 +203,13 @@ images (i.e. there was no good pixel from any input image at that location).
 
  If a template image is available, this final stage will generate
 `sub_sci.fits` difference images.  These are straight subtractions,
-without any psf convolution.  The bad pixel masks from the target
-epoch and the template epoch are combined and
+without any psf convolution.  
 
 The accompanying `sub_wht.fits` files are the inverse of the combined
-variance from the template and the target epochs, and `sub_bpx.fits` are the
-union of the two contributing bad pixel masks.
-Applying the badpix mask to the diff
-image then produces the final `sub_masked.fits` product.
-
+variance from the template and the target epochs, and `sub_bpx.fits`
+are the union of the two contributing bad pixel masks.  Applying the
+badpix mask to the diff image then produces the final
+`sub_masked.fits` product.
 
 In the current version, lots of cruft is left behind in the sub-directories
 (intermeidate flt files, ctx.fits, etc). A future version will have a
