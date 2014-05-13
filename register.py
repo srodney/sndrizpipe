@@ -58,9 +58,9 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
             "Re-run with clobber=True if you really want it done." )
         return( wcsname )
 
+    rfluxcol, rfluxunits = None, None
     if refcat :
         refCatalog = ascii.read( refcat )
-        rfluxcol, rfluxunits = None, None
         if len(refCatalog.columns)>2 :
             for icol in range(len(refCatalog.columns)) :
                 if 'flux' in refCatalog.colnames[icol].lower():
