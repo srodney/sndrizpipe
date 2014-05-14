@@ -50,16 +50,16 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               dodriz1=False, drizcr=1, intravisitreg=False,
               # Register to a given image or  epoch, visit and filter
               doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
-              # Drizzle registered flts by epoch and filter 
+              # Drizzle registered flts by epoch and filter
               dodriz2=False,
               # make diff images
               dodiff=False, tempepoch=0,
-              refcat=None,
-              interactive=False, threshold=4, fluxmin=None, fluxmax=None,
-              rfluxmax=None, rfluxmin=None, refnbright=None,
-              searchrad=1.5, minobj=10,
-              mjdmin=0, mjdmax=0, epochspan=5,
-              ra=None, dec=None, rot=0, imsize_arcsec=None, 
+              # source detection and matching
+              interactive=False, threshold=5,
+              peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
+              searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
+              refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
+              shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
               pixscale=None, pixfrac=None, wht_type='ERR',
               clobber=False, verbose=True, debug=False ):
     """ 
@@ -148,6 +148,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
     epochlist = sorted( np.unique([ exp.epoch for exp in explist ] ) )
 
+    if shiftonly : fitgeometry='shift'
+    else : fitgeometry = 'rscale'
+
     # STAGE 2 :
     # Construct the WCS reference image
     if dorefim :
@@ -198,10 +201,16 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     ideepest  = np.argmax( visit_depth )
                     refvisit = unique_visits[ideepest]
             refvisit = refvisit.upper()
+            if refvisit.find('.') > 0 :
+                refvisit = refvisit.replace('.','_')
             
             explistRI = sorted( [ exp for exp in explist_all if exp.epoch==refepoch
                                   and exp.filter==reffilter and exp.pidvisit==refvisit ] )
-
+            if len(explistRI)<1 :
+                raise exceptions.RuntimeError(
+                    "Error : not enough exposures for refim with"
+                    "epoch %i  ;  filter %s  ;  visit %s  "%(
+                        refepoch, reffilter, refvisit ) )
             refdrzdir = os.path.dirname( refim )
             if not os.path.isdir( refdrzdir ) :
                 os.makedirs( refdrzdir )
@@ -230,9 +239,11 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 wcsname = register.RunTweakReg(
                     refdrzsci, refim=refim, refcat=refcat,
                     wcsname='REFCAT:%s'%os.path.basename(refcat),
-                    fitgeometry='rscale', searchrad=searchrad,
+                    searchrad=searchrad,
                     refnbright=refnbright, rfluxmax=rfluxmax,
-                    rfluxmin=rfluxmin, fluxmin=fluxmin, fluxmax=fluxmax,
+                    rfluxmin=rfluxmin, peakmin=peakmin, peakmax=peakmax,
+                    # fluxmin=fluxmin, fluxmax=fluxmax,
+                    fitgeometry=fitgeometry,
                     threshold=threshold, minobj=minobj,
                     interactive=interactive, clobber=clobber, debug=debug )
             if os.path.exists( refim ):  os.remove(refim)
@@ -269,9 +280,14 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 continue
             if intravisitreg : 
                 # run tweakreg for intravisit registration tweaks
-                register.intraVisit(
-                    fltlistFEV, fluxmin=fluxmin, fluxmax=fluxmax, minobj=minobj,
-                    threshold=threshold, interactive=interactive, debug=debug )
+                wcsname = register.RunTweakReg(
+                    fltlistFEV, wcsname='INTRAVIS', refcat=refcat,
+                    searchrad=searchrad, threshold=threshold, minobj=minobj,
+                    peakmin=peakmin, peakmax=peakmax,
+                    # fluxmin=fluxmin, fluxmax=fluxmax,
+                    fitgeometry=fitgeometry,
+                    refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
+                    interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
@@ -317,8 +333,10 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             wcsname = register.RunTweakReg(
                 outsciFEV, wcsname='REFIM:%s'%os.path.basename(refim),
                 refim=refim, refcat=refcat,
-                searchrad=searchrad, fluxmin=fluxmin, fluxmax=fluxmax,
-                threshold=threshold, minobj=minobj,
+                searchrad=searchrad, threshold=threshold, minobj=minobj,
+                peakmin=peakmin, peakmax=peakmax,
+                # fluxmin=fluxmin, fluxmax=fluxmax,
+                fitgeometry=fitgeometry,
                 refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
                 interactive=interactive, clobber=clobber, debug=debug )
 
@@ -478,18 +496,24 @@ def mkparser():
     refpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the tweakreg refimage.',default='')
     refpar.add_argument('--refvisit', metavar='PID.vis', help='Use this PID.visit to define the tweakreg refimage [e.g. 12099.A1]',default='')
 
-    regpar = parser.add_argument_group( "(4) Settings for tweakreg WCS registration stage")
+    imfindpar = parser.add_argument_group( "(4a) Settings for tweakreg.imagefind source detection")
+    imfindpar.add_argument('--threshold', metavar='5', type=float, help='Detection threshold in sigmas for tweakreg object detection.',default=5)
+    imfindpar.add_argument('--peakmin', metavar='X', type=float, help='Require peak flux above this value for tweakreg object detection.',default=None)
+    imfindpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=None)
+    # imfindpar.add_argument('--fluxmin', metavar='X', type=float, help='Require total flux above this value for tweakreg object detection.',default=0)
+    # imfindpar.add_argument('--fluxmax', metavar='X', type=float, help='Require total flux below this value for tweakreg object detection.',default=0)
+
+
+    regpar = parser.add_argument_group( "(4b) Settings for tweakreg WCS registration stage")
     regpar.add_argument('--interactive', action='store_true', help='Run tweakreg interactively (showing plots)',default=False)
     regpar.add_argument('--intravisitreg', action='store_true', help='Run tweakreg before first drizzle stage to do intra-visit registration.',default=False)
-    regpar.add_argument('--refcat', metavar='X.cat', help='Existing source catalog for limiting tweakreg matches.',default='')
     regpar.add_argument('--searchrad', metavar='X', type=float, help='Search radius in arcsec for tweakreg catalog matching.',default=1.5)
-    regpar.add_argument('--searchthresh', metavar='5', type=float, help='Detection threshold in sigmas for tweakreg object detection.',default=5)
-    regpar.add_argument('--peakmin', metavar='X', type=float, help='Require peak flux above this value for tweakreg object detection.',default=0)
-    regpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=0)
-    regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=0)
-    regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=0)
-    regpar.add_argument('--refnbright', metavar='X', type=float, help='Number of brightest objects to use from the tweakreg reference catalog.',default=0)
     regpar.add_argument('--minobj', metavar='X', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
+    regpar.add_argument('--refcat', metavar='X.cat', help='Existing source catalog for limiting tweakreg matches.',default='')
+    regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=None)
+    regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=None)
+    regpar.add_argument('--refnbright', metavar='X', type=float, help='Number of brightest objects to use from the tweakreg reference catalog.',default=None)
+    regpar.add_argument('--shiftonly', action='store_true', help='Only allow a shift for image alignment. No rotation or scale.',default=False)
 
     drizpar = parser.add_argument_group( "(5,6) Settings for astrodrizzle and subtraction stages")
     drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
@@ -532,12 +556,12 @@ def main() :
              refvisit=argv.refvisit, reffilter=argv.reffilter,
              tempepoch=argv.tempepoch,
              refcat=argv.refcat, interactive=argv.interactive,
-             fluxmin=argv.peakmin, fluxmax=argv.peakmax,
-             rfluxmax=argv.rfluxmin or None,
-             rfluxmin=argv.rfluxmax or None,
-             refnbright=argv.refnbright or None,
-             searchrad=argv.searchrad, threshold=argv.searchthresh,
-             minobj=argv.minobj,
+             peakmin=argv.peakmin, peakmax=argv.peakmax,
+             # fluxmin=argv.fluxmin, fluxmax=argv.fluxmax,
+             rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
+             refnbright=argv.refnbright,
+             searchrad=argv.searchrad, threshold=argv.threshold,
+             minobj=argv.minobj, shiftonly=argv.shiftonly,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
              ra=argv.ra, dec=argv.dec, rot=argv.rot,

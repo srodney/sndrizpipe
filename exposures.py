@@ -250,7 +250,7 @@ class Exposure( object ):
         # Visit name and exposure number (in the orbit sequence), 
         # as defined in APT
         self.visit = self.linenum.split('.')[0]
-        self.pidvisit = '%i.%s'%(self.pid, self.visit)
+        self.pidvisit = '%i_%s'%(self.pid, self.visit)
         self.expnum = int( self.linenum.split('.')[1] )
 
         if self.header['PATTERN1'] == 'NONE' :
@@ -300,7 +300,7 @@ class Exposure( object ):
         (pre-registration) drizzle pass, possibly including the CR
         rejection step.
         """
-        return( '%s_e%02i_v%s'%( self.filter, self.epoch, self.pidvisit ) )
+        return( '%s_e%02i_%s'%( self.filter, self.epoch, self.pidvisit ) )
 
     @property
     def FEgroup( self ):

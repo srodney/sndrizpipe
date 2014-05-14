@@ -15,7 +15,8 @@ import exceptions
 def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZPIPE', refnbright=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
-                 fluxmin=None, fluxmax=None, threshold=4.0,
+                 # fluxmax=None, fluxmin=None,
+                 peakmin=None, peakmax=None, threshold=4.0,
                  minobj=10, fitgeometry='rscale',
                  interactive=False, clobber=False, debug=False ):
     """Run tweakreg on a set of flt files or drz files."""
@@ -80,6 +81,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                               refxyunits='degrees', rfluxcol=rfluxcol,
                               rfluxunits=rfluxunits, refnbright=refnbright,
                               rfluxmax=rfluxmax, rfluxmin=rfluxmin,
+                              # fluxmax=fluxmax, fluxmin=fluxmin,
+                              peakmax=peakmax, peakmin=peakmin,
                               searchrad=searchrad, conv_width=conv_width,
                               threshold=threshold, separation=0,
                               tolerance=searchrad, minobj=minobj,
@@ -95,8 +98,10 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
             printfloat("   rfluxmin = %.1f  # min flux for refcat sources", rfluxmin)
             printfloat("   rfluxmax = %.1f  # max flux for refcat sources", rfluxmax)
             printfloat("   searchrad  = %.1f  # matching search radius (arcsec)", searchrad )
-            printfloat("   fluxmin    = %.1f  # min total flux for detected sources", fluxmin )
-            printfloat("   fluxmax    = %.1f  # max total flux for detected sources", fluxmax )
+            printfloat("   peakmin    = %.1f  # min peak flux for detected sources", peakmin )
+            printfloat("   peakmax    = %.1f  # max peak flux for detected sources", peakmax )
+            # printfloat("   fluxmin    = %.1f  # min total flux for detected sources", fluxmin )
+            # printfloat("   fluxmax    = %.1f  # max total flux for detected sources", fluxmax )
             printfloat("   threshold  = %.1f  # detection threshold in sigma ", threshold )
             printfloat("   fitgeometry= %s  # fitting geometry [shift,rscale] ", fitgeometry )
             print('Adjust parameters using "parname = value" syntax.') 
@@ -114,8 +119,10 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                 elif parname=='rfluxmin' : rfluxmin=float( value )
                 elif parname=='rfluxmax' : rfluxmax=float( value )
                 elif parname=='searchrad' : searchrad=float( value )
-                elif parname=='fluxmin' : fluxmin=float( value )
-                elif parname=='fluxmax' : fluxmax=float( value )
+                elif parname=='peakmin' : peakmin=float( value )
+                elif parname=='peakmax' : peakmax=float( value )
+                # elif parname=='fluxmax' : fluxmax=float( value )
+                # elif parname=='fluxmin' : fluxmin=float( value )
                 elif parname=='threshold' : threshold=float( value )
                 elif parname=='fitgeometry' : fitgeometry=value
 
@@ -127,14 +134,16 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                       refxcol=1, refycol=2, refxyunits='degrees', 
                       refnbright=refnbright, rfluxcol=rfluxcol, rfluxunits=rfluxunits,
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
-                      searchrad=searchrad, conv_width=conv_width, threshold=threshold, 
+                      # fluxmax=fluxmax, fluxmin=fluxmin,
+                      peakmax=peakmax, peakmin=peakmin,
+                      searchrad=searchrad, conv_width=conv_width, threshold=threshold,
                       separation=0, tolerance=searchrad, minobj=minobj,
-                      clean=(not debug) )
+                      clean=(interactive or debug) )
     return( wcsname )
 
 
 
-def intraVisit( fltlist, fluxmin=None, fluxmax=None, threshold=4.0,
+def intraVisit( fltlist, peakmin=None, peakmax=None, threshold=4.0,
                 minobj=10, interactive=False, clobber=False, debug=False ):
     """ 
     Run tweakreg on a list of flt images belonging to the same visit, 
@@ -148,7 +157,7 @@ def intraVisit( fltlist, fluxmin=None, fluxmax=None, threshold=4.0,
     if debug : import pdb; pdb.set_trace() 
     wcsname = RunTweakReg(
         fltlist, refcat=None, wcsname='INTRAVIS', searchrad=1.0,
-        fluxmin=fluxmin, fluxmax=fluxmax, fitgeometry='shift', minobj=minobj,
+        peakmin=peakmin, peakmax=peakmax, fitgeometry='shift', minobj=minobj,
         threshold=threshold, interactive=interactive,  clobber=clobber )
     return( wcsname )
 
@@ -224,9 +233,9 @@ AttributeError: 'WCS' object has no attribute 'extname'
     wcs = pywcs.WCS( header=hdr, fobj=image )
 
     imcat = catalogs.generateCatalog(
-        wcs, mode='automatic',catalog=None,
-        computesig=computesig, skysigma=skysigma, threshold=threshold,
-        fluxmin=fluxmin, fluxmax=fluxmax, conv_width=conv_width )
+        wcs, mode='automatic',catalog=None, computesig=computesig,
+        skysigma=skysigma, threshold=threshold, conv_width=conv_width, )
+        # fluxmin=fluxmin, fluxmax=fluxmax,  )
     return( imcat )
 
 
