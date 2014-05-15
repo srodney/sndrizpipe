@@ -17,11 +17,13 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  # fluxmax=None, fluxmin=None,
                  peakmin=None, peakmax=None, threshold=4.0,
-                 minobj=10, fitgeometry='rscale',
-                 interactive=False, clobber=False, debug=False ):
+                 minobj=10, nbright=None, fitgeometry='rscale',
+                 interactive=False, clean=False, clobber=False, debug=False ):
     """Run tweakreg on a set of flt files or drz files."""
     if debug : import pdb; pdb.set_trace()
     from astropy.io import ascii
+
+    if nbright : clean=False # don't clean up .coo files. We'll need them.
 
     #convert the input list into a useable list of images for astrodrizzle
     if type( files ) == str :
@@ -73,6 +75,15 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
 
     if interactive : 
         while True : 
+            if nbright :
+                # make source catalogs for each SCI extension
+                srcCatListFile = mkSourceCatList(
+                    filelist, filelist[0].split('_')[0]+'_cat.list',
+                    threshold=threshold, peakmin=peakmin, peakmax=peakmax )
+            else :
+                srcCatListFile=None
+                nbright=None
+
             print( "sndrizzle.register:  Running a tweakreg loop interactively.")
             tweakreg.TweakReg(files, updatehdr=False, wcsname='TWEAK',
                               see2dplot=True, residplot='both', 
@@ -86,8 +97,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                               searchrad=searchrad, conv_width=conv_width,
                               threshold=threshold, separation=0,
                               tolerance=searchrad, minobj=minobj,
-                              clean=(not (interactive or debug) ),
-                              writecat=(interactive or debug) )
+                              catfile=srcCatListFile, nbright=nbright,
+                              clean=clean, writecat=(interactive or debug) )
             print( "==============================\n sndrizzle.register:\n")
             userin = raw_input("Adopt these tweakreg settings? y/[n]").lower()
             if userin.startswith('y'): 
@@ -128,6 +139,17 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
 
     print( "==============================\n sndrizzle.register:\n")
     print( "  Final tweakreg run for updating headers.")
+
+    if nbright :
+        # make source catalogs for each SCI extension
+        srcCatListFile = mkSourceCatList(
+            filelist, filelist[0].split('_')[0]+'_cat.list',
+            threshold=threshold, peakmin=peakmin, peakmax=peakmax )
+    else :
+        srcCatListFile=None
+        nbright=None
+
+
     tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       see2dplot=False, residplot='No plot', 
                       fitgeometry=fitgeometry, refcat=refcat, refimage=refim,
@@ -137,6 +159,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                       # fluxmax=fluxmax, fluxmin=fluxmin,
                       peakmax=peakmax, peakmin=peakmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold,
+                      catile=srcCatListFile, nbright=nbright,
                       separation=0, tolerance=searchrad, minobj=minobj,
                       clean=(interactive or debug) )
     return( wcsname )
@@ -197,15 +220,40 @@ def printfloat( fmtstr, value ):
             print( fmtstr[:pct] + ' ??? ' + fmtstr[f:] )
 
 
+def mkSourceCatList( imfilelist, listfilename, computesig=True, skysigma=0,
+                     threshold=4.0, peakmin=None, peakmax=None,
+                     nsigma=1.5, fluxmin=None, fluxmax=None ) :
+    """Generate source catalogs for every image file in imfilelist.
+    Then make a .list file that lists each file and its corresponding xy
+    coo file (suitable for passing to TweakReg)
+    """
+    fout = open( listfilename, mode='w')
+    for imfile in imfilelist :
+        catlist = mkSourceCatalog(
+            imfile, computesig=computesig, skysigma=skysigma,
+            threshold=threshold, peakmin=peakmin, peakmax=peakmax,
+                     nsigma=nsigma, fluxmin=fluxmin, fluxmax=fluxmax )
+        print >> fout, '%s %s'%( imfile, '  '.join(catlist) )
+    fout.close()
+    return( listfilename )
+
+
+
 def mkSourceCatalog( imfile, computesig=True, skysigma=0,
-                     threshold=4.0, fluxmin=None, fluxmax=None ) :
-    """NOT FUNCTIONAL"""
-    import pywcs
+                     threshold=4.0, peakmin=None, peakmax=None,
+                     nsigma=1.5, fluxmin=None, fluxmax=None ) :
+    """Detect sources in the image and generate a catalog of source
+    x,y positions and fluxes.
+
+    Uses the same imagefind algorithm as tweakreg.
+
+    Generates a separate xy catalog file for each SCI extension.
+    """
     from drizzlepac import catalogs
+    from drizzlepac.util import wcsutil
 
     image = pyfits.open( imfile )
     hdr = image[0].header
-    data = image[0].data
 
     instrument = hdr['INSTRUME']
     detector   = hdr['DETECTOR']
@@ -219,24 +267,21 @@ def mkSourceCatalog( imfile, computesig=True, skysigma=0,
     else : 
         conv_width = 2.5
 
-
-    # PROBLEM :
-    err = """
-AttributeError: 'WCS' object has no attribute 'extname'
-> /usr/local/Ureka/python/lib/python2.7/site-packages/drizzlepac/catalogs.py(268)__init__()
-    267         Catalog.__init__(self,wcs,catalog_source,**kwargs)
---> 268         if self.wcs.extname == ('',None): self.wcs.extname = (0)
-    269         self.source = pyfits.getdata(self.wcs.filename,ext=self.wcs.extname)
-    """
-
-    wcs = pywcs.WCS( hdr )
-    wcs = pywcs.WCS( header=hdr, fobj=image )
-
-    imcat = catalogs.generateCatalog(
-        wcs, mode='automatic',catalog=None, computesig=computesig,
-        skysigma=skysigma, threshold=threshold, conv_width=conv_width, )
-        # fluxmin=fluxmin, fluxmax=fluxmax,  )
-    return( imcat )
+    catfilelist = []
+    for iext in range(len(image)):
+        if not image[iext].name.upper().startswith('SCI') : continue
+        wcs = wcsutil.HSTWCS( image, ext=iext)
+        imcat = catalogs.generateCatalog(
+            wcs, mode='automatic',catalog=None, computesig=computesig,
+            skysigma=skysigma, threshold=threshold, conv_width=conv_width,
+            peakmin=peakmin, peakmax=peakmax,
+            fluxmin=fluxmin, fluxmax= fluxmax,
+            nsigma=nsigma, )
+        imcat.buildCatalogs()
+        xycatfile = imfile.replace('.fits','_sci%i.xycoo'%iext )
+        imcat.writeXYCatalog(xycatfile)
+        catfilelist.append( xycatfile )
+    return( catfilelist )
 
 
 def getpixscale( fitsfile, returntuple=False ):

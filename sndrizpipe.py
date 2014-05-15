@@ -55,7 +55,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # make diff images
               dodiff=False, tempepoch=0,
               # source detection and matching
-              interactive=False, threshold=5,
+              interactive=False, threshold=5, nbright=None,
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
               searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
               refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
@@ -508,12 +508,13 @@ def mkparser():
     regpar.add_argument('--interactive', action='store_true', help='Run tweakreg interactively (showing plots)',default=False)
     regpar.add_argument('--intravisitreg', action='store_true', help='Run tweakreg before first drizzle stage to do intra-visit registration.',default=False)
     regpar.add_argument('--searchrad', metavar='X', type=float, help='Search radius in arcsec for tweakreg catalog matching.',default=1.5)
-    regpar.add_argument('--minobj', metavar='X', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
+    regpar.add_argument('--minobj', metavar='N', type=int, help='Minimum number matched objects for tweakreg registration.',default=10)
     regpar.add_argument('--refcat', metavar='X.cat', help='Existing source catalog for limiting tweakreg matches.',default='')
     regpar.add_argument('--rfluxmin', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects brighter than this magnitude.',default=None)
     regpar.add_argument('--rfluxmax', metavar='X', type=float, help='Limit the tweakreg reference catalog to objects fainter than this magnitude.',default=None)
-    regpar.add_argument('--refnbright', metavar='X', type=float, help='Number of brightest objects to use from the tweakreg reference catalog.',default=None)
+    regpar.add_argument('--refnbright', metavar='N', type=int, help='Number of brightest objects to use from the tweakreg reference catalog.',default=None)
     regpar.add_argument('--shiftonly', action='store_true', help='Only allow a shift for image alignment. No rotation or scale.',default=False)
+    regpar.add_argument('--nbright', metavar='N', type=int, help='Number of brightest objects to use from each single-exposure source catalog.',default=None)
 
     drizpar = parser.add_argument_group( "(5,6) Settings for astrodrizzle and subtraction stages")
     drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
@@ -559,7 +560,7 @@ def main() :
              peakmin=argv.peakmin, peakmax=argv.peakmax,
              # fluxmin=argv.fluxmin, fluxmax=argv.fluxmax,
              rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
-             refnbright=argv.refnbright,
+             refnbright=argv.refnbright, nbright=argv.nbright,
              searchrad=argv.searchrad, threshold=argv.threshold,
              minobj=argv.minobj, shiftonly=argv.shiftonly,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
