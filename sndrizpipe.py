@@ -61,7 +61,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
               shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
               pixscale=None, pixfrac=None, wht_type='ERR',
-              clobber=False, verbose=True, debug=False ):
+              clean=False, clobber=False, verbose=True, debug=False ):
     """ 
     Primary pipeline function.  Executes all the intermediate steps: 
        register, sort, drizzle, subtract, mask
@@ -70,6 +70,21 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     import shutil
     if debug : import pdb; pdb.set_trace()
     from drizzlepac.tweakback import tweakback
+
+    # Check for logically incompatible parameters
+    if nbright and minobj and (nbright < minobj-1) :
+        raise exceptions.RuntimeError(
+            ' nbright < minobj \n'
+            'You have nbright=%i and minobj=%i\n'%(nbright,minobj) +
+            "That doesn't work." )
+    if shiftonly : fitgeometry='shift'
+    else : fitgeometry = 'rscale'
+    if fitgeometry=='rscale' and ((nbright and nbright<3) or minobj<3):
+        raise exceptions.RuntimeError(
+            ' Not requiring enough stars for rotation+scale fit.\n'
+            'You have nbright=%i and minobj=%i\n'%(nbright,minobj) +
+            "and you also have fitgeometry='rscale'."
+            "Try again with --shiftonly" )
 
     topdir = os.path.abspath( '.' )
     fltdir = outroot + '.flt' 
@@ -116,7 +131,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if not refim :
         # No refimage has been specified, so set the default refimage name
         refdrzdir = '%s.refim'%outroot
-        refimbasename = '%s_wcsref_sci.fits'%(outroot)
+        refimbasename = '%s_wcsref_drz_sci.fits'%(outroot)
         refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
 
     if refcat : refcat = os.path.abspath(refcat)
@@ -147,9 +162,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     FEgrouplist = sorted( np.unique( [ exp.FEgroup for exp in explist ] ) )
     filterlist = sorted( np.unique( [ exp.filter for exp in explist ] ) )
     epochlist = sorted( np.unique([ exp.epoch for exp in explist ] ) )
-
-    if shiftonly : fitgeometry='shift'
-    else : fitgeometry = 'rscale'
 
     # STAGE 2 :
     # Construct the WCS reference image
@@ -220,7 +232,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 shutil.copy( os.path.join( refsrcdir, fltfile ), refdrzdir )
             fltlistRI = [ exp.filename for exp in explistRI ]
 
-            refimroot = '%s_wcsref'%outroot
+            refimroot = refim[:refim.find('_drz_sci.fits')]
             os.chdir( refdrzdir )
 
             # drizzle the ref image using firstDrizzle :
@@ -228,14 +240,13 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # pixscale and pixfrac based on number of flts)
             refdrzsci, refimwht = drizzle.firstDrizzle(
                 fltlistRI, refimroot, driz_cr=drizcr )
+            assert( refdrzsci == refim )
 
             if refcat :
                 # Update the WCS header info in the ref image to match the
                 # given reference catalog
                 if verbose : print( " Registering reference image"
                                     "%s to ref catalog %s"%(refdrzsci, refcat))
-                if os.path.exists( refim ):  os.remove(refim)
-                shutil.copy( refdrzsci, refim )
                 wcsname = register.RunTweakReg(
                     refdrzsci, refim=refim, refcat=refcat,
                     wcsname='REFCAT:%s'%os.path.basename(refcat),
@@ -245,11 +256,20 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     # fluxmin=fluxmin, fluxmax=fluxmax,
                     fitgeometry=fitgeometry,
                     threshold=threshold, minobj=minobj,
+                    nbright=nbright, clean=clean, verbose=verbose,
                     interactive=interactive, clobber=clobber, debug=debug )
-            if os.path.exists( refim ):  os.remove(refim)
-            os.rename(refdrzsci,refim)
             os.chdir(topdir)
-            
+
+    # If refnbright was provided, then we must make an RA,Dec reference
+    # catalog when one does not already exist
+    if refnbright and not refcat :
+        refdrzdir = os.path.dirname( refim )
+        os.chdir( refdrzdir)
+        refcatfile = register.mkSourceCatalog(
+            os.path.basename(refim), threshold=threshold,
+            peakmin=peakmin, peakmax=peakmax )[0]
+        os.chdir( topdir )
+        refcat = os.path.abspath( os.path.join( refdrzdir, refcatfile ) )
 
     # STAGE 3 :
     # Drizzle together each drizzle group (same epoch, visit and
@@ -285,9 +305,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     searchrad=searchrad, threshold=threshold, minobj=minobj,
                     peakmin=peakmin, peakmax=peakmax,
                     # fluxmin=fluxmin, fluxmax=fluxmax,
-                    fitgeometry=fitgeometry,
+                    fitgeometry=fitgeometry, nbright=nbright, clean=clean,
                     refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
-                    interactive=interactive, clobber=clobber, debug=debug )
+                    verbose=verbose, interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
                 wcskey=((intravisitreg and 'INTRAVIS') or '') )
@@ -336,9 +356,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 searchrad=searchrad, threshold=threshold, minobj=minobj,
                 peakmin=peakmin, peakmax=peakmax,
                 # fluxmin=fluxmin, fluxmax=fluxmax,
-                fitgeometry=fitgeometry,
+                fitgeometry=fitgeometry, nbright=nbright, clean=clean,
                 refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
-                interactive=interactive, clobber=clobber, debug=debug )
+                verbose=verbose,interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
             tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs,
@@ -473,6 +493,7 @@ def mkparser():
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
+    parser.add_argument('--clean', action='store_true', help='Clean up cruft. [False]', default=False )
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
@@ -568,7 +589,7 @@ def main() :
              ra=argv.ra, dec=argv.dec, rot=argv.rot,
              imsize_arcsec=argv.imsize,
              pixscale=argv.pixscale, pixfrac=argv.pixfrac,
-             wht_type=argv.wht_type,
+             wht_type=argv.wht_type, clean=argv.clean,
              clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
     return 0
 
