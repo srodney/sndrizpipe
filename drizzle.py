@@ -112,9 +112,11 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
-        driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix, 
+        driz_sep_bits=drizpar['drizbits'],
+        driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix,
         final_wcs=True, final_pixfrac=pixfrac, final_scale=pixscale,
-        final_ra=ra, final_dec=dec, final_rot=rot, 
+        final_bits=drizpar['drizbits'],
+        final_ra=ra, final_dec=dec, final_rot=rot,
         final_outnx=imsize_pix, final_outny=imsize_pix, 
         final_wht_type=wht_type )
                     
@@ -152,7 +154,7 @@ def getdrizpar( instrument, detector, nexposures=None ) :
             # drizbits DQ flags allowed as OK :
             # 8192 = up-the-ramp CR; 512 = bad flat (blobs); 64 = warm pixel
             return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
-                     'drizbits':'8192,512,64'} )
+                     'drizbits':'8192,512'} )
         elif detector.startswith('UV'):
             if nexposures == 1 :
                 pixscale=0.04
@@ -161,7 +163,7 @@ def getdrizpar( instrument, detector, nexposures=None ) :
             # drizbits DQ flags allowed as OK :
             # 64 = warm pixel; 32 = hot pix CTE tail
             return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
-                     'drizbits':'64,32' } )
+                     'drizbits':'32' } )
     elif instrument=='ACS': 
         if detector.startswith('WFC'):
             if nexposures == 1 :
@@ -173,7 +175,7 @@ def getdrizpar( instrument, detector, nexposures=None ) :
             # drizbits DQ flags allowed as OK :
             # 64 = warm pixel; 32 = hot pix CTE tail
             return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
-                     'drizbits':'64,32'} )
+                     'drizbits':'32'} )
     else :
         raise exceptions.RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )
 
