@@ -16,6 +16,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZPIPE', refnbright=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  # fluxmax=None, fluxmin=None,
+                 nclip=3, sigmaclip=3.0,
                  peakmin=None, peakmax=None, threshold=4.0,
                  minobj=10, nbright=None, fitgeometry='rscale',
                  interactive=False, clean=False, clobber=False,
@@ -35,7 +36,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
             "List of input files has no real files: %s"%str(files))
 
     # pre-clean any existing WCS header info
-    # clearAltWCS( filelist )
+    if clobber :
+        clearAltWCS( filelist )
 
     hdr1 = pyfits.getheader( filelist[0] )
     conv_width = getconvwidth(filelist[0])
@@ -65,6 +67,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                 elif 'mag' in refCatalog.colnames[icol].lower():
                     rfluxcol = icol+1
                     rfluxunits = 'mag'
+        if not refim :
+            refim = filelist[0]
 
     if interactive : 
         while True :
@@ -85,7 +89,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
             tweakreg.TweakReg(files, updatehdr=False, wcsname='TWEAK',
                               use2dhist=use2dhist,
                               see2dplot=True, residplot='both',
-                              fitgeometry=fitgeometry, refcat=refcat,
+                              fitgeometry=fitgeometry, nclip=nclip,
+                              sigma=sigmaclip, refcat=refcat,
                               refimage=refim, refxcol=1, refycol=2,
                               refxyunits='degrees', rfluxcol=rfluxcol,
                               rfluxunits=rfluxunits, refnbright=refnbright,
@@ -116,7 +121,10 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
             # printfloat("   fluxmax    = %.1f  # max total flux for detected sources", fluxmax )
             printfloat("   threshold  = %.1f  # detection threshold in sigma ", threshold )
             printfloat("   fitgeometry= %s  # fitting geometry [shift,rscale] ", fitgeometry )
-            print('Adjust parameters using "parname = value" syntax.') 
+            printfloat("   nclip      = %i  # Number of sigma-clipping iterations", nclip )
+            printfloat("   sigmaclip  = %.1f  # Clipping limit in sigmas ", sigmaclip )
+            print('Adjust parameters using "parname = value" syntax.')
+
             print('Enter "run" to re-run tweakreg with new parameters.') 
             while True : 
                 userin = raw_input("   ").lower()
@@ -137,6 +145,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                 # elif parname=='fluxmin' : fluxmin=float( value )
                 elif parname=='threshold' : threshold=float( value )
                 elif parname=='fitgeometry' : fitgeometry=value
+                elif parname=='nclip' : nclip=int(value)
+                elif parname=='sigmaclip' : sigmaclip=float(value)
 
     print( "==============================\n sndrizzle.register:\n")
     print( "  Final tweakreg run for updating headers.")
@@ -158,7 +168,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
     tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       use2dhist=use2dhist,
                       see2dplot=False, residplot='No plot',
-                      fitgeometry=fitgeometry, refcat=refcat, refimage=refim,
+                      fitgeometry=fitgeometry, nclip=nclip, sigma=sigmaclip,
+                      refcat=refcat, refimage=refim,
                       refxcol=1, refycol=2, refxyunits='degrees', 
                       refnbright=refnbright, rfluxcol=rfluxcol, rfluxunits=rfluxunits,
                       rfluxmax=rfluxmax, rfluxmin=rfluxmin,
@@ -243,11 +254,9 @@ def SingleStarReg( imfile, refimfile, xy=[], xyref=[], wcsname='SINGLESTAR',
 def clearAltWCS( fltlist ) : 
     """ pre-clean any alternate wcs solutions from flt headers"""
     from drizzlepac import wcs_functions
-    from drizzlepac.imageObject import imageObject
 
     for fltfile in fltlist : 
         hdulist = pyfits.open( fltfile, mode='update' )
-        extlist = range( len(hdulist) )
         extlist = []
         for ext in range( len(hdulist) ) : 
             if 'WCSNAME' in hdulist[ext].header : extlist.append( ext )
@@ -393,8 +402,10 @@ def getpixscale( fitsfile, returntuple=False ):
     if isinstance( fitsfile, pyfits.header.Header ) :
         hdr = fitsfile
     elif isinstance( fitsfile, pyfits.hdu.hdulist.HDUList ) :
-        if 'sci' in [ hdu.name.lower() for hdu in fitsfile ] :
-            hdr = fitsfile['SCI'].header
+        extnamelist = [ hdu.name.lower() for hdu in fitsfile ]
+        if 'sci' in extnamelist :
+            isci = extnamelist.index('sci')
+            hdr = fitsfile[isci].header
         else :
             hdr = fitsfile[0].header
     elif isinstance( fitsfile, pyfits.hdu.image.PrimaryHDU ) :
@@ -402,8 +413,6 @@ def getpixscale( fitsfile, returntuple=False ):
     else :
         raise exceptions.RuntimeError( 'input object type %s is unrecognized')
 
-    # if plate scale is already defined,
-    # (as in the fits standard) just return it
     if 'CD1_1' in hdr :
         cd11 = hdr['CD1_1']
         cd12 = hdr['CD1_2']

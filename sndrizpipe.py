@@ -59,6 +59,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
               searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
               refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
+              nclip=3, sigmaclip=3.0,
               shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
               pixscale=None, pixfrac=None, wht_type='ERR',
               clean=False, clobber=False, verbose=True, debug=False ):
@@ -240,7 +241,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # pixscale and pixfrac based on number of flts)
             refdrzsci, refimwht = drizzle.firstDrizzle(
                 fltlistRI, refimroot, driz_cr=drizcr )
-            assert( refdrzsci == refim )
+            #assert( refdrzsci == refim )
+            refim = refdrzsci
 
             if refcat :
                 # Update the WCS header info in the ref image to match the
@@ -256,7 +258,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     # fluxmin=fluxmin, fluxmax=fluxmax,
                     fitgeometry=fitgeometry,
                     threshold=threshold, minobj=minobj,
-                    nbright=nbright, clean=clean, verbose=verbose,
+                    nbright=nbright, nclip=nclip, sigmaclip=sigmaclip,
+                    clean=clean, verbose=verbose,
                     interactive=interactive, clobber=clobber, debug=debug )
             os.chdir(topdir)
 
@@ -306,7 +309,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     peakmin=peakmin, peakmax=peakmax,
                     # fluxmin=fluxmin, fluxmax=fluxmax,
                     fitgeometry=fitgeometry, nbright=nbright, clean=clean,
-                    refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
+                    refnbright=refnbright, nclip=nclip, sigmaclip=sigmaclip,
+                    rfluxmin=rfluxmin, rfluxmax=rfluxmax,
                     verbose=verbose, interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
@@ -358,6 +362,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 # fluxmin=fluxmin, fluxmax=fluxmax,
                 fitgeometry=fitgeometry, nbright=nbright, clean=clean,
                 refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
+                nclip=nclip, sigmaclip=sigmaclip,
                 verbose=verbose,interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
@@ -536,6 +541,8 @@ def mkparser():
     regpar.add_argument('--refnbright', metavar='N', type=int, help='Number of brightest objects to use from the tweakreg reference catalog.',default=None)
     regpar.add_argument('--shiftonly', action='store_true', help='Only allow a shift for image alignment. No rotation or scale.',default=False)
     regpar.add_argument('--nbright', metavar='N', type=int, help='Number of brightest objects to use from each single-exposure source catalog.',default=None)
+    regpar.add_argument('--nclip', metavar='3', type=int, help='Number of sigma-clipping iterations for catalog matching.',default=3)
+    regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
     drizpar = parser.add_argument_group( "(5,6) Settings for astrodrizzle and subtraction stages")
     drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
@@ -583,6 +590,7 @@ def main() :
              rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
              refnbright=argv.refnbright, nbright=argv.nbright,
              searchrad=argv.searchrad, threshold=argv.threshold,
+             nclip=argv.nclip, sigmaclip=argv.sigmaclip,
              minobj=argv.minobj, shiftonly=argv.shiftonly,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
