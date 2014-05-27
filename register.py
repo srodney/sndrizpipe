@@ -8,7 +8,6 @@ import pyfits
 from stsci import tools
 from drizzlepac import tweakreg
 import stwcs
-import exposures
 import exceptions
 
 
@@ -16,7 +15,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                  wcsname='SNDRIZPIPE', refnbright=None,
                  rfluxmax=None, rfluxmin=None, searchrad=1.0,
                  # fluxmax=None, fluxmin=None,
-                 nclip=3, sigmaclip=3.0,
+                 nclip=3, sigmaclip=3.0, computesig=False,
                  peakmin=None, peakmax=None, threshold=4.0,
                  minobj=10, nbright=None, fitgeometry='rscale',
                  interactive=False, clean=False, clobber=False,
@@ -41,6 +40,10 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
 
     hdr1 = pyfits.getheader( filelist[0] )
     conv_width = getconvwidth(filelist[0])
+    if computesig==False :
+        skysigma = getskysigma( filelist )
+    else :
+        skysigma=0.0
 
     if (nbright and nbright<3) or minobj<3:
         use2dhist=False
@@ -70,7 +73,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
         if not refim :
             refim = filelist[0]
 
-    if interactive : 
+    if interactive :
         while True :
             if nbright :
                 # make source catalogs for each SCI extension
@@ -90,6 +93,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                               use2dhist=use2dhist,
                               see2dplot=True, residplot='both',
                               fitgeometry=fitgeometry, nclip=nclip,
+                              computesig=computesig, skysigma=skysigma,
                               sigma=sigmaclip, refcat=refcat,
                               refimage=refim, refxcol=1, refycol=2,
                               refxyunits='degrees', rfluxcol=rfluxcol,
@@ -168,6 +172,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
     tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       use2dhist=use2dhist,
                       see2dplot=False, residplot='No plot',
+                      computesig=computesig, skysigma=skysigma,
                       fitgeometry=fitgeometry, nclip=nclip, sigma=sigmaclip,
                       refcat=refcat, refimage=refim,
                       refxcol=1, refycol=2, refxyunits='degrees', 
@@ -387,6 +392,36 @@ def getconvwidth( fitsfile ):
     else :
         conv_width = 2.5
     return( conv_width )
+
+def getskysigma( filelist, usemode=False ):
+    """ Compute the median sky noise for the given image or list of images.
+    The default uses the skysigma algorithm as stated in the drizzlepac manual (v1.0, 2012)
+    instead of the one implemented in drizzlepac/catalogs.py.  That is, we
+    use 1.5 times the sigma-clipped standard deviation of the image.  With usemode
+    set to True, we instead use the square root of twice the mode.
+    """
+    from stsci import imagestats
+    from numpy import median, sqrt, abs
+
+    modelist, stddevlist = [], []
+    for file in filelist :
+        hdulist = pyfits.open( file )
+
+        extnamelist = [ ext.name.upper() for ext in hdulist ]
+        if 'SCI' in extnamelist :
+            iextlist = [ iext for iext in range(len(extnamelist))
+                         if extnamelist[iext]=='SCI' ]
+        else :
+            iextlist = [ 0 ]
+        for iext in iextlist:
+            ext = hdulist[ iext ]
+            istats = imagestats.ImageStats(
+                ext.data, nclip=3, fields='mode,stddev', binwidth=0.01 )
+            stddevlist.append( istats.stddev )
+            modelist.append( abs( istats.mode ))
+    if usemode :
+        return( sqrt( 2.0 * median( modelist ) ))
+    return( 1.5 * median( stddevlist ) )
 
 def getpixscale( fitsfile, returntuple=False ):
     """ compute the pixel scale of the reference pixel in arcsec/pix in
