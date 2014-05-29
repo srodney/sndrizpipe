@@ -126,6 +126,10 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
     """
     import os
     import shutil
+    import stat
+
+    # file permissions for chmod ug+rw o+r
+    PERMISSIONS = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH
 
     if onlyfilters :
         if type(onlyfilters)==str :
@@ -153,6 +157,7 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
                 os.remove( newfilename )
         if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
         shutil.copy( exp.filepath, newfilename )
+        os.chmod( newfilename, PERMISSIONS )
 
 
 

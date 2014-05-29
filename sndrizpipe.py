@@ -22,6 +22,10 @@ import exceptions
 import os
 import register, exposures, drizzle, badpix, imarith
 import numpy as np
+import stat
+
+# file permissions for chmod ug+rw o+r
+PERMISSIONS = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH
 
 def multipipe() : 
     """ 
@@ -231,6 +235,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltfile = os.path.basename( exp.filename )
                 refsrcdir = os.path.abspath( fltdir )
                 shutil.copy( os.path.join( refsrcdir, fltfile ), refdrzdir )
+                os.chmod( os.path.join(refdrzdir,fltfile), PERMISSIONS )
             fltlistRI = [ exp.filename for exp in explistRI ]
 
             refimroot = refim[:refim.find('_drz_sci.fits')]
