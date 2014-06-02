@@ -30,7 +30,7 @@ def writeDS9reg( catalog, regfile, color='green', shape='diamond',
         print>>fout,'point  %s  %s  # point=%s'%( xstr, ystr, shape )
     fout.close()
 
-def convertToRefcat( incatfile, refcatfile, fluxcol=None,
+def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
                      ds9regfile=False, clobber=False, verbose=False ):
     """ Read in the catalog incatfile and write out as a tweakreg reference
     catalog called refcatfile.
@@ -45,6 +45,7 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None,
     import os
     from astropy.io import ascii
     import exceptions
+    import numpy as np
     incat = ascii.read( incatfile )
 
     if os.path.exists( refcatfile ) and not clobber :
@@ -74,6 +75,15 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None,
                 "There is no column %s in %s."%(fluxcol, incatfile) )
         savecolnames = [racol,deccol,fluxcol]
         outcolnames = ['RA','DEC','FLUX']
+    elif magcol :
+        if magcol not in incat.colnames :
+            raise exceptions.RuntimeError(
+                "There is no column %s in %s."%(magcol, incatfile) )
+        savecolnames = [racol,deccol,magcol]
+        # convert from mags to flux using an arbitrary zpt = 25
+        igoodmags = np.where( (incat[magcol]>-9) & (incat[magcol]<99) )
+        incat[magcol][igoodmags] = 10**(-0.4*(incat[magcol][igoodmags]-25))
+        outcolnames = ['RA','DEC','FLUX']
     else :
         savecolnames = [racol,deccol]
         outcolnames = ['RA','DEC']
@@ -102,8 +112,12 @@ def main():
     parser.add_argument('refcatfile', help='Output reference catalog file name')
     parser.add_argument('--fluxcol', default=None,
                         help='Name of the input catalog column containing '
-                             'fluxes or magnitudes, to be used by tweakreg '
+                             'fluxes, to be used by tweakreg '
                              'for limiting detected source lists.')
+    parser.add_argument('--magcol', default=None,
+                        help='Name of the input catalog column containing '
+                             'magnitudes, to be converted to fluxes and then'
+                             'used by tweakreg for limiting source lists.')
     parser.add_argument('--ds9reg', type=str, metavar='X.reg',
                         help='Write out a ds9 region file.' )
     parser.add_argument('--clobber', default=False, action='store_true',
@@ -113,8 +127,8 @@ def main():
 
     argv = parser.parse_args()
     convertToRefcat( argv.incatfile, argv.refcatfile, fluxcol=argv.fluxcol,
-                     ds9regfile=argv.ds9reg, clobber=argv.clobber,
-                     verbose=argv.verbose )
+                     magcol=argv.magcol, ds9regfile=argv.ds9reg,
+                     clobber=argv.clobber, verbose=argv.verbose )
 
 if __name__=='__main__' :
     main()
