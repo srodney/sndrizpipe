@@ -129,8 +129,8 @@ def unionmask( imfile1, imfile2, outfile, clobber=False, verbose=False):
     uniondat = array(imdat1,dtype=uint8) | array(imdat2,dtype=uint8)
 
     # TODO : make a useful header
-    im1head.update("SRCIM1",imfile1,"First source image  for badpixunion")
-    im1head.update("SRCIM2",imfile2,"Second source image for badpixunion")
+    im1head["SRCIM1"] = (imfile1, "First source image  for badpixunion")
+    im1head["SRCIM2"] = (imfile2,"Second source image for badpixunion")
     outdir = os.path.split( outfile )[0]
     if outdir :
         if not os.path.isdir(outdir):
@@ -138,45 +138,6 @@ def unionmask( imfile1, imfile2, outfile, clobber=False, verbose=False):
     pyfits.writeto( outfile, uniondat, header=im1head,clobber=clobber,
                     output_verify='fix')
     return( outfile )
-
-def combine_ivm_maps( im1, im2, outfile, clobber=False, verbose=False):
-    """
-    Combine two inverse-variance weight maps ivm1 and ivm2.
-    Returns the name of the output composite weight map.
-    """
-    import os
-    import pyfits
-    from numpy import array, uint8, ma
-
-    if os.path.exists( outfile ) :
-        if not clobber :
-            print( "%s exists. Not clobbering."%outfile)
-            return( outfile )
-        else :
-            os.remove( outfile )
-
-    # read in the images
-    im1head = pyfits.getheader( im1 )
-    im1dat = pyfits.getdata( im1 )
-    im2dat = pyfits.getdata( im2 )
-    var1 = ma.masked_array( 1./im1dat )
-    var2 = ma.masked_array( 1./im2dat )
-
-    ivm12 = 1./( var1 + var2 )
-    ivm12.set_fill_value(0)
-    ivm12out = ivm12.filled()
-
-    # TODO : make a useful header
-    im1head.update("SRCIM1",im1,"First source image  for IVM sum")
-    im1head.update("SRCIM2",im2,"Second source image for IVM sum")
-    outdir = os.path.split( outfile )[0]
-    if outdir :
-        if not os.path.isdir(outdir):
-            os.makedirs( outdir )
-    pyfits.writeto( outfile, ivm12out, header=im1head,clobber=clobber,
-                    output_verify='fix')
-    return( outfile )
-
 
 
 def applyUnionMask( scifile, badpixfile1, badpixfile2, outfile=None,
