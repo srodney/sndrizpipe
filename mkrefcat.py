@@ -31,6 +31,7 @@ def writeDS9reg( catalog, regfile, color='green', shape='diamond',
     fout.close()
 
 def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
+                     trimctr=None, trimrad=None,
                      ds9regfile=False, clobber=False, verbose=False ):
     """ Read in the catalog incatfile and write out as a tweakreg reference
     catalog called refcatfile.
@@ -95,9 +96,45 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
         if outcol not in incat.colnames :
             incat.rename_column( incol, outcol )
 
+    if trimctr and trimrad :
+        if verbose : print('Trimming to %.1f arcsec around %s'%(trimrad,trimctr))
+        trimra,trimdec = trimctr.split(',')
+        incat = trimcat( incat, float(trimra), float(trimdec), trimrad )
     incat.write( refcatfile, format='ascii.commented_header' )
     if ds9regfile :
         writeDS9reg( incat, ds9regfile )
+
+def trimcat( incat, ra, dec, radius, outcatfile=None):
+    """Trim the input catalog incat, excluding any sources more than
+    <radius> arcsec from the given  RA,Dec in decimal degrees.
+    Assumes the input catalog has position columns 'RA' and 'DEC' in decimal deg.
+
+    The incat may be a catalog object or a filename.
+    ra and dec must be in decimal degrees
+    radius must be a float, in arcsec.
+
+    If outcatfile is given, the trimmed catalog is written to that file.
+    """
+    # TODO : update this with a newer astropy (v0.4+?) with coordinate arrays
+    from astropy.io import ascii
+    from astropy.coordinates import ICRS
+    from astropy import units as u
+
+    if isinstance( incat, str) :
+        incat = ascii.read( incat )
+    racat = incat['RA']
+    deccat = incat['DEC']
+
+    ctr = ICRS( ra=float(ra),dec=float(dec), unit=(u.degree, u.degree))
+    idrop = []
+    for i in range(len(racat)):
+        src = ICRS( ra=racat[i],dec=deccat[i], unit=(u.degree, u.degree))
+        darcsec = ctr.separation( src ).arcsec
+        if darcsec > radius : idrop.append( i )
+    incat.remove_rows( idrop )
+    if outcatfile :
+        incat.write( outcatfile, format='ascii.commented_header')
+    return( incat )
 
 def main():
     import argparse
@@ -125,9 +162,15 @@ def main():
     parser.add_argument('--verbose', default=False, action='store_true',
                         help='Turn on verbose output. [False]')
 
+    parser.add_argument('--trimctr', type=str, metavar='RA,DEC', default=None,
+                        help='Center point for catalog trimming, in decimal deg.')
+    parser.add_argument('--trimrad', type=float, metavar='[arcsec]', default=None,
+                        help='Radius for catalog trimming, in arcsec.')
+
     argv = parser.parse_args()
     convertToRefcat( argv.incatfile, argv.refcatfile, fluxcol=argv.fluxcol,
                      magcol=argv.magcol, ds9regfile=argv.ds9reg,
+                     trimctr=argv.trimctr, trimrad=argv.trimrad,
                      clobber=argv.clobber, verbose=argv.verbose )
 
 if __name__=='__main__' :
