@@ -5,7 +5,7 @@ A module for sorting HST imaging data into groups based on observation date and 
 
 """
 __all__=["sndrizpipe", "exposures","drizzle","badpix","register","imarith",
-         "testpipe", "mkrefcat.py"]
+         "testpipe", "mkrefcat", "mkscaledtemplate"]
 import sndrizpipe
 import exposures
 import drizzle
@@ -14,4 +14,5 @@ import register
 import imarith
 import testpipe
 import mkrefcat
+import mkscaledtemplate
 

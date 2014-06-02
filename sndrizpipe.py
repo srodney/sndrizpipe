@@ -57,7 +57,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # Drizzle registered flts by epoch and filter
               dodriz2=False,
               # make diff images
-              dodiff=False, tempepoch=0,
+              dodiff=False, tempepoch=0, tempfilters=None,
               # source detection and matching
               interactive=False, threshold=5, nbright=None,
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
@@ -75,6 +75,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     import shutil
     if debug : import pdb; pdb.set_trace()
     from drizzlepac.tweakback import tweakback
+    from mkscaledtemplate import mkscaledtemplate, camfiltername
 
     # Check for logically incompatible parameters
     if nbright and minobj and (nbright < minobj-1) :
@@ -90,6 +91,19 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             'You have nbright=%i and minobj=%i\n'%(nbright,minobj) +
             "and you also have fitgeometry='rscale'."
             "Try again with --shiftonly" )
+    if onlyfilters :
+        if type(onlyfilters)==str :
+            onlyfilters = onlyfilters.lower().split(',')
+        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
+    if type(onlyepochs) in [str,int,float] :
+        onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
+
+    if tempfilters is not None and len(onlyfilters) != 1 :
+        raise exceptions.RuntimeError(
+            'You specified filter(s) to combine/scale for the template epoch'
+            'but you did not limit the processing to a single filter.'
+            "If you use --tempfilters then you must also specify a "
+            "single filter for processing with '--filters X'")
 
     topdir = os.path.abspath( '.' )
     fltdir = outroot + '.flt' 
@@ -101,13 +115,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         doreg=True
         dodriz2=True
         dodiff=True
-
-    if onlyfilters : 
-        if type(onlyfilters)==str : 
-            onlyfilters = onlyfilters.lower().split(',')
-        onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
-    if type(onlyepochs) in [str,int,float] :
-        onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
 
     # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
@@ -442,11 +449,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 explistF = [ exp for exp in explist if exp.filter==filter ]
                 drzsuffix = explistF[0].drzsuffix
 
-            # now do the subtractions
-            tempdir = outroot+'.e%02i'%tempepoch
-            tempsci = os.path.join( os.path.abspath(tempdir), '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
-            tempwht = tempsci.replace('sci.fits','wht.fits')
-            tempbpx = tempsci.replace('sci.fits','bpx.fits')
+            # now make templates and do the subtractions
             topdir = os.path.abspath( '.' )
             for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
@@ -464,6 +467,30 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 if not os.path.isfile( thisregsci ) : 
                     os.chdir( topdir ) 
                     continue
+
+                # Locate and/or construct templates
+                tempdir = os.path.join( os.path.abspath(topdir), outroot+'.e%02i'%tempepoch )
+                if tempfilters is not None :
+                    tempsci = os.path.join( tempdir, '%s_~%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
+                else :
+                    tempsci = os.path.join( tempdir, '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,filter,tempepoch,drzsuffix))
+                if tempfilters and not os.path.exists( tempsci ) :
+                    # Combine multiple filters from the template epoch
+                    # to make a pseudo-template with ~filtername in the filename.
+                    tempfilter1 = tempfilters.split(',')[0]
+                    tempsci1 = os.path.join( tempdir, '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,tempfilter1,tempepoch,drzsuffix))
+                    if ',' in tempfilters :
+                        tempfilter2 = tempfilters.split(',')[1]
+                        tempsci2 = os.path.join( tempdir, '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,tempfilter2,tempepoch,drzsuffix))
+                    else :
+                        tempfilter2, tempsci2 = None, None
+                    targetfilter = camfiltername( thisregsci )
+                    tempsci, tempwht, tempbpx = mkscaledtemplate(
+                        targetfilter, tempsci1, tempsci2, outfile=tempsci,
+                        filtdir='HSTFILTERS', verbose=verbose, clobber=clobber )
+                tempwht = tempsci.replace('sci.fits','wht.fits')
+                tempbpx = tempsci.replace('sci.fits','bpx.fits')
+
                 thisdiffim = outrootFE + "-e%02i_sub_sci.fits"%tempepoch
 
                 if not os.path.isfile( tempsci ) or not os.path.isfile( thisregsci) :
@@ -475,7 +502,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
                 diffim = imarith.imsubtract( tempsci, thisregsci, outfile=thisdiffim,
                                               clobber=clobber, verbose=verbose, debug=debug)
-                diffwht = badpix.combine_ivm_maps( thisregwht, tempwht,
+                diffwht = imarith.combine_ivm_maps( thisregwht, tempwht,
                                                    diffim.replace('sci.fits','wht.fits'),
                                                    clobber=clobber, verbose=verbose )
                 diffbpx = badpix.unionmask( tempbpx, thisregbpx,
@@ -549,7 +576,7 @@ def mkparser():
     regpar.add_argument('--nclip', metavar='3', type=int, help='Number of sigma-clipping iterations for catalog matching.',default=3)
     regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
-    drizpar = parser.add_argument_group( "(5,6) Settings for astrodrizzle and subtraction stages")
+    drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage")
     drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
                          help='Astrodrizzle cosmic ray rejection stage.'
                          "\n0 : don't do any new CR rejection "
@@ -562,7 +589,10 @@ def mkparser():
     drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
     drizpar.add_argument('--wht_type', metavar='ERR', type=str, help='Type of the weight image.', default='ERR')
-    drizpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
+
+    diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")
+    diffpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
+    diffpar.add_argument('--tempfilters', metavar='X,Y', type=str, help='Make a composite template by combining images in these filters.', default=None )
 
     return parser
 
@@ -588,7 +618,7 @@ def main() :
              drizcr=argv.drizcr, intravisitreg=argv.intravisitreg,
              refim=argv.refimage, refepoch=argv.refepoch,
              refvisit=argv.refvisit, reffilter=argv.reffilter,
-             tempepoch=argv.tempepoch,
+             tempepoch=argv.tempepoch, tempfilters=argv.tempfilters,
              refcat=argv.refcat, interactive=argv.interactive,
              peakmin=argv.peakmin, peakmax=argv.peakmax,
              # fluxmin=argv.fluxmin, fluxmax=argv.fluxmax,
