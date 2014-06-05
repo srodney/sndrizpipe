@@ -160,7 +160,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             os.rename( scifile0, scifile1 )
             whtfile0 = scifile0.replace( '_sci.fits','_wht.fits')
             whtfile1 = scifile1.replace( '_sci.fits','_wht.fits')
-            os.rename( whtfile0, whtfile1 )
+            if os.path.isfile(whtfile0) : os.rename( whtfile0, whtfile1 )
             scilist.append( scifile1 )
             whtlist.append( whtfile1 )
 
