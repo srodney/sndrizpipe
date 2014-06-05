@@ -43,26 +43,33 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False,
         resetbits=int((driz_cr and docombine) and 4096),
-        restore=True, preserve=True, overwrite=False, clean=True,
+        restore=True, preserve=True, overwrite=False, clean=clean,
         median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
         combine_type='iminmed',
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
         driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'], 
         driz_sep_rot='INDEF',  final_rot='INDEF'  )
+
     if fltlist[0].find('_flc.fits')>0  : drzsfx = '_drc'
     else: drzsfx = '_drz'    
     outscifile = outroot+drzsfx+'_sci.fits'
     outwhtfile = outroot+drzsfx+'_wht.fits'
     scrubnans( outscifile ) 
     scrubnans( outwhtfile )
+
+    if clean :
+        ctxfile = scifile.replace( '_sci.fits','_ctx.fits')
+        if os.path.isfile( ctxfile ) :
+            os.remove( ctxfile )
+
     return( ( outscifile, outwhtfile ) )
 
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
                    singlesci=False, pixscale=None, pixfrac=None, wht_type='ERR',
-                   clobber=False, verbose=True, debug=False  ) :
+                   clean=False, clobber=False, verbose=True, debug=False  ) :
     """ 
     Run astrodrizzle on a pile of flt images.
     
@@ -109,7 +116,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, updatewcs=False, resetbits=0,
-        restore=False, preserve=True, overwrite=True, clean=True, 
+        restore=False, preserve=True, overwrite=True, clean=clean,
         median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
@@ -163,6 +170,12 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         bpxfile = badpix.zerowht2badpix(
             whtfile, bpxfile, verbose=verbose, clobber=clobber )
         bpxlist.append( bpxfile )
+
+    if clean :
+        for scifile in scilist :
+            ctxfile = scifile.replace( '_sci.fits','_ctx.fits')
+            if os.path.isfile( ctxfile ) :
+                os.remove( ctxfile )
 
     return( scilist, whtlist, bpxlist )
 

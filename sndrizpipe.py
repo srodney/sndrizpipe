@@ -512,18 +512,78 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                                          clobber=clobber, verbose=verbose)
                     diffim_masked = badpix.applymask( diffim, diffbpx,
                                                      clobber=clobber, verbose=verbose)
+                    if clean :
+                        # delete the sub_sci.fits, b/c it is superseded
+                        os.remove( diffim )
                     print("Created diff image %s, wht map %s, and bpx mask %s"%(
                         diffim_masked, diffwht, diffbpx ) )
                 os.chdir( topdir )
             pass # end for epoch in epochlist
         pass # end for filter in filterlist
+
+    if clean > 1 :
+        topdir = os.path.abspath( '.' )
+        if verbose :
+            print("sndrizpipe : (7) CLEAN level 2 : remove OrIg flt files.")
+            if clean>2: print("Clean level 3 : remove last-drizzle flt files")
+        for filter in filterlist :
+            if onlyfilters and filter not in onlyfilters : continue
+            for epoch in epochlist :
+                if onlyepochs and epoch not in onlyepochs : continue
+                if epoch == tempepoch : continue
+                explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
+                epochdirFE = explistFE[0].epochdir
+                os.chdir( epochdirFE )
+                for exp in explistFE :
+                    fltfile = exp.filename
+                    fltfileOrIg = os.path.join('OrIg_files',fltfile)
+                    if os.path.isfile( fltfileOrIg ) :
+                        os.remove( fltfileOrIg )
+                    if clean>2 and os.path.isfile( fltfile ) :
+                        os.remove( fltfile )
+                os.chdir( topdir )
+
+    if clean > 3 :
+        if verbose :
+            print("Clean level 4 : remove single-visit 'nat' drizzle and tweakreg products")
+        for FEVgroup in FEVgrouplist :
+            explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
+            thisepoch = explistFEV[0].epoch
+            thisfilter = explistFEV[0].filter
+            if onlyepochs and thisepoch not in onlyepochs : continue
+            if onlyfilters and thisfilter not in onlyfilters : continue
+            epochdir = explistFEV[0].epochdir
+            outrootFEV = '%s_%s_nat'%(outroot,FEVgroup)
+
+            os.chdir( epochdir )
+            drzsuffix = explistFEV[0].drzsuffix
+            natsci = "%s_%s_sci.fits"%(outrootFEV,drzsuffix)
+            if clean>3 and os.path.isfile( natsci ) :
+                os.remove( natsci )
+            natwht = natsci.replace('sci.fits','wht.fits')
+            if clean>3 and os.path.isfile( natwht ) :
+                os.remove( natwht )
+            natctx = natsci.replace('sci.fits','ctx.fits')
+            if clean>3 and os.path.isfile( natctx ) :
+                os.remove( natctx )
+            if clean > 3 :
+                natroot = natsci.replace('.fits','')
+                natcoolist = glob.glob( natroot+'_*.coo') + \
+                             glob.glob( natroot+'_*.match' ) + \
+                             glob.glob( natroot+'_*.list' )
+                for natcoo in natcoolist :
+                    os.remove( natcoo )
+            os.chdir( topdir )
+
+
     return 0
 
 def mkparser():
     import argparse
+
     parser = argparse.ArgumentParser(
         description='Run astrodrizzle and tweakreg on a set of flt or flc' +
-        'images, building single-epoch drizzled images and diff images.')
+        'images, building single-epoch drizzled images and diff images.' )
 
     # Required positional argument
     parser.add_argument('rootname', help='Root name for the input flt dir (<rootname>.flt), also used for the output _drz products. ')
@@ -534,7 +594,13 @@ def mkparser():
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
-    parser.add_argument('--clean', action='store_true', help='Clean up cruft. [False]', default=False )
+    parser.add_argument('--clean', type=int, choices=[0,1,2,3,4], default=1,
+                        help='Clean up cruft.'
+                         " 0 : Keep all intermediate files."
+                         " 1 : Remove intermediate drizzle and diff files, including ctx.fits and sub_sci.fits [the default];"
+                         " 2 : and clear out OrIg_files/*fl?.fits;"
+                         " 3 : and remove last-drizzle flts in epoch sub-dirs;"
+                         " 4 : and delete nat_drz products and tweakreg catalogs.")
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
@@ -580,8 +646,8 @@ def mkparser():
     regpar.add_argument('--nclip', metavar='3', type=int, help='Number of sigma-clipping iterations for catalog matching.',default=3)
     regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
-    drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage")
-    drizpar.add_argument('--drizcr', metavar='N', type=int, default=1,
+    drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
+    drizpar.add_argument('--drizcr', type=int, default=1, choices=[0,1,2],
                          help='Astrodrizzle cosmic ray rejection stage.'
                          "\n0 : don't do any new CR rejection "
                          '\n1 : run CR rejection only within the visit. [the default]'
