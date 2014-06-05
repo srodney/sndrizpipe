@@ -4,6 +4,12 @@ sndrizpipe
 Image registration, combination and subtraction with astrodrizzle+tweakreg.
 Aimed at simple processing of supernova imaging from HST.
 
+Cite it using the v1.0 DOI : ![v1.0 DOI](https://zenodo.org/badge/4159/srodney/sndrizpipe.png)
+
+---------
+Dependencies
+--------
+
 Requires drizzlepac from STScI.  Recommended installation method: use
 the Ureka package, which provides python, numpy, pyraf, drizzlepac,
 etc., with mutually compatible versions, bundled and maintained by
