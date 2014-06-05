@@ -252,7 +252,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # (full frame, native rotation, auto-selecting the optimal
             # pixscale and pixfrac based on number of flts)
             refdrzsci, refimwht = drizzle.firstDrizzle(
-                fltlistRI, refimroot, driz_cr=drizcr )
+                fltlistRI, refimroot, driz_cr=drizcr, clean=clean )
             #assert( refdrzsci == refim )
             refim = refdrzsci
 
@@ -273,11 +273,28 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     nbright=nbright, nclip=nclip, sigmaclip=sigmaclip,
                     clean=clean, verbose=verbose,
                     interactive=interactive, clobber=clobber, debug=debug )
+
+            if clean :
+                for fltfile in fltlistRI :
+                    if os.path.isfile( fltfile ) :
+                        os.remove( fltfile )
+                    if os.path.isfile( 'OrIg_files/%s'%fltfile) :
+                        os.remove( 'OrIg_files/%s'%fltfile)
+                if os.path.isdir( 'OrIg_files') :
+                    os.rmdir( 'OrIg_files')
+                refimwht = refdrzsci.replace('sci.fits','wht.fits')
+                if os.path.isfile( refimwht ) :
+                    os.remove( refimwht )
+                refimctx = refdrzsci.replace('sci.fits','ctx.fits')
+                if os.path.isfile( refimctx ) :
+                    os.remove( refimctx )
+
             os.chdir(topdir)
 
     # If refnbright was provided, then we must make an RA,Dec reference
     # catalog when one does not already exist
     if refnbright and not refcat :
+        assert( os.path.exists( refim ) )
         refdrzdir = os.path.dirname( refim )
         os.chdir( refdrzdir)
         refcatfile = register.mkSourceCatalog(
@@ -415,7 +432,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
-                singlesci=singlesubs,
+                singlesci=singlesubs, clean=clean,
                 clobber=clobber, verbose=verbose, debug=debug  )
 
             os.chdir( topdir )
@@ -533,6 +550,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 if epoch == tempepoch : continue
                 explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
                 epochdirFE = explistFE[0].epochdir
+                if not os.path.isdir( epochdirFE ) : continue
                 os.chdir( epochdirFE )
                 for exp in explistFE :
                     fltfile = exp.filename
@@ -555,6 +573,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             epochdir = explistFEV[0].epochdir
             outrootFEV = '%s_%s_nat'%(outroot,FEVgroup)
 
+            if not os.path.isdir( epochdir ) : continue
             os.chdir( epochdir )
             drzsuffix = explistFEV[0].drzsuffix
             natsci = "%s_%s_sci.fits"%(outrootFEV,drzsuffix)

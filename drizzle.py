@@ -59,7 +59,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     scrubnans( outwhtfile )
 
     if clean :
-        ctxfile = scifile.replace( '_sci.fits','_ctx.fits')
+        ctxfile = outscifile.replace( '_sci.fits','_ctx.fits')
         if os.path.isfile( ctxfile ) :
             os.remove( ctxfile )
 
@@ -69,7 +69,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
                    singlesci=False, pixscale=None, pixfrac=None, wht_type='ERR',
-                   clean=False, clobber=False, verbose=True, debug=False  ) :
+                   clean=True, clobber=False, verbose=True, debug=False  ) :
     """ 
     Run astrodrizzle on a pile of flt images.
     
@@ -163,6 +163,12 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             os.rename( whtfile0, whtfile1 )
             scilist.append( scifile1 )
             whtlist.append( whtfile1 )
+
+            if clean :
+                maskfile1 = scifile0.replace( '_single_sci.fits','_sci1_single_mask.fits')
+                if os.path.isfile( maskfile1 ) : os.remove( maskfile1 )
+                maskfile2 = scifile0.replace( '_single_sci.fits','_sci2_single_mask.fits')
+                if os.path.isfile( maskfile2 ) : os.remove( maskfile2 )
 
     bpxlist = []
     for whtfile in whtlist :
