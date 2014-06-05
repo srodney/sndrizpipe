@@ -61,7 +61,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
-                   pixscale=None, pixfrac=None, wht_type='ERR',
+                   singlesci=False, pixscale=None, pixfrac=None, wht_type='ERR',
                    clobber=False, verbose=True, debug=False  ) :
     """ 
     Run astrodrizzle on a pile of flt images.
@@ -72,6 +72,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     Returns the names of the output sci and wht.fits images.
     """
     if debug : import pdb; pdb.set_trace()
+    import badpix
 
     #convert the input list into a useable list of images for astrodrizzle
     if type( fltlist ) == str : 
@@ -106,7 +107,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         docombine=False
 
     imsize_pix = imsize_arcsec/pixscale                     
-    astrodrizzle.AstroDrizzle( 
+    astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, updatewcs=False, resetbits=0,
         restore=False, preserve=True, overwrite=True, clean=True, 
         median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
@@ -131,7 +132,39 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     scrubnans( outscifile ) 
     scrubnans( outwhtfile )
 
-    return( ( outscifile, outwhtfile ) )
+    scilist = [ outscifile ]
+    whtlist = [ outwhtfile ]
+    if singlesci :
+        astrodrizzle.AstroDrizzle(
+            fltlist, output=outroot, updatewcs=False, resetbits=0,
+            restore=False, preserve=False, overwrite=False, clean=False,
+            driz_separate=True,
+            median=False, blot=False, driz_cr=False, driz_combine=False,
+            driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
+            driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
+            driz_sep_bits=drizpar['drizbits'],
+            driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix )
+        # give the output single_sci.fits files some more helpful names
+        for fltfile in fltlist :
+            scifile0 = fltfile.replace('_flt.fits','_single_sci.fits')
+            scifile1 = outroot + '_' + scifile0
+            if not os.path.isfile( scifile0 ) :
+                raise exceptions.RuntimeError('Missing _single_sci.fits file %s'%scifile0)
+            os.rename( scifile0, scifile1 )
+            whtfile0 = scifile0.replace( '_sci.fits','_wht.fits')
+            whtfile1 = scifile1.replace( '_sci.fits','_wht.fits')
+            os.rename( whtfile0, whtfile1 )
+            scilist.append( scifile1 )
+            whtlist.append( whtfile1 )
+
+    bpxlist = []
+    for whtfile in whtlist :
+        bpxfile = whtfile.replace('_wht','_bpx')
+        bpxfile = badpix.zerowht2badpix(
+            whtfile, bpxfile, verbose=verbose, clobber=clobber )
+        bpxlist.append( bpxfile )
+
+    return( scilist, whtlist, bpxlist )
 
 
 

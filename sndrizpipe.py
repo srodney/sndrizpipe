@@ -55,7 +55,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # Register to a given image or  epoch, visit and filter
               doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
               # Drizzle registered flts by epoch and filter
-              dodriz2=False,
+              dodriz2=False, singlesubs=False,
               # make diff images
               dodiff=False, tempepoch=0, tempfilters=None,
               # source detection and matching
@@ -411,15 +411,13 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 os.chdir( topdir )
                 continue
 
-            outsciFE, outwhtFE = drizzle.secondDrizzle(
+            outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
+                singlesci=singlesubs,
                 clobber=clobber, verbose=verbose, debug=debug  )
 
-            outbpxFE = outwhtFE.replace('_wht','_bpx')
-            outbpxFE = badpix.zerowht2badpix(
-                outwhtFE, outbpxFE, verbose=verbose, clobber=clobber )
             os.chdir( topdir )
 
 
@@ -430,8 +428,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             print("sndrizpipe : (6) DIFF : subtracting template images.")
         for filter in filterlist :
             if onlyfilters and filter not in onlyfilters : continue
-            template = None
-            if tempepoch == None : 
+            if tempepoch == None :
                 # User did not define a template epoch, so we default
                 # to use the first available epoch
                 for epoch in epochlist : 
@@ -445,9 +442,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     if os.path.isfile( os.path.join( epochdir, outrootFE+"_reg_%s_sci.fits"%drzsuffix )) : 
                         tempepoch = epoch
                         break
-            else : 
-                explistF = [ exp for exp in explist if exp.filter==filter ]
-                drzsuffix = explistF[0].drzsuffix
 
             # now make templates and do the subtractions
             topdir = os.path.abspath( '.' )
@@ -459,12 +453,10 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 epochdirFE = explistFE[0].epochdir
                 outrootFE =  "%s_%s"%(outroot,explistFE[0].FEgroup)
                 drzsuffix = explistFE[0].drzsuffix
-                thisregsci = "%s_reg_%s_sci.fits"%(outrootFE,drzsuffix)
-                thisregwht = "%s_reg_%s_wht.fits"%(outrootFE,drzsuffix)
-                thisregbpx = "%s_reg_%s_bpx.fits"%(outrootFE,drzsuffix)
-                
+                regsci = "%s_reg_%s_sci.fits"%(outrootFE,drzsuffix)
+
                 os.chdir( epochdirFE )
-                if not os.path.isfile( thisregsci ) : 
+                if not os.path.isfile( regsci ) :
                     os.chdir( topdir ) 
                     continue
 
@@ -484,35 +476,47 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                         tempsci2 = os.path.join( tempdir, '%s_%s_e%02i_reg_%s_sci.fits'%(outroot,tempfilter2,tempepoch,drzsuffix))
                     else :
                         tempfilter2, tempsci2 = None, None
-                    targetfilter = camfiltername( thisregsci )
+                    targetfilter = camfiltername( regsci )
                     tempsci, tempwht, tempbpx = mkscaledtemplate(
                         targetfilter, tempsci1, tempsci2, outfile=tempsci,
                         filtdir='HSTFILTERS', verbose=verbose, clobber=clobber )
                 tempwht = tempsci.replace('sci.fits','wht.fits')
                 tempbpx = tempsci.replace('sci.fits','bpx.fits')
 
-                thisdiffim = outrootFE + "-e%02i_sub_sci.fits"%tempepoch
+                regscilist = [regsci]
+                subscilist = [ outrootFE + "-e%02i_sub_sci.fits"%tempepoch ]
 
-                if not os.path.isfile( tempsci ) or not os.path.isfile( thisregsci) :
-                    print( "Can't create diff image %s"%thisdiffim )
-                    print( "  missing either  %s"%tempsci )
-                    print( "    or  %s"%thisregsci )
-                    os.chdir( topdir )
-                    continue
+                if singlesubs :
+                    for exp in explistFE :
+                        singlesci = '%s_reg_%s_single_sci.fits'%( outrootFE, exp.rootname )
+                        subsci = '%s-e%02i_%s_single_sub_sci.fits'%( outrootFE, tempepoch, exp.rootname )
+                        regscilist.append( singlesci )
+                        subscilist.append( subsci )
+                for regsci, subsci in zip( regscilist, subscilist ):
+                    if not os.path.isfile( tempsci ) or not os.path.isfile( regsci) :
+                        print( "Can't create diff image %s"%subsci )
+                        print( "  missing either  %s"%tempsci )
+                        print( "    or  %s"%regsci )
+                        continue
 
-                diffim = imarith.imsubtract( tempsci, thisregsci, outfile=thisdiffim,
-                                              clobber=clobber, verbose=verbose, debug=debug)
-                diffwht = imarith.combine_ivm_maps( thisregwht, tempwht,
-                                                   diffim.replace('sci.fits','wht.fits'),
-                                                   clobber=clobber, verbose=verbose )
-                diffbpx = badpix.unionmask( tempbpx, thisregbpx,
-                                     diffim.replace('sci.fits','bpx.fits'),
-                                     clobber=clobber, verbose=verbose)
-                diffim_masked = badpix.applymask( diffim, diffbpx,
-                                                 clobber=clobber, verbose=verbose)
-                print("Created diff image %s, wht map %s, and bpx mask %s"%(
-                    diffim_masked, diffwht, diffbpx ) )
+                    regwht = regsci.replace( '_sci.fits','_wht.fits')
+                    regbpx = regsci.replace( '_sci.fits','_bpx.fits')
+
+                    diffim = imarith.imsubtract( tempsci, regsci, outfile=subsci,
+                                                  clobber=clobber, verbose=verbose, debug=debug)
+                    diffwht = imarith.combine_ivm_maps( regwht, tempwht,
+                                                       diffim.replace('sci.fits','wht.fits'),
+                                                       clobber=clobber, verbose=verbose )
+                    diffbpx = badpix.unionmask( tempbpx, regbpx,
+                                         diffim.replace('sci.fits','bpx.fits'),
+                                         clobber=clobber, verbose=verbose)
+                    diffim_masked = badpix.applymask( diffim, diffbpx,
+                                                     clobber=clobber, verbose=verbose)
+                    print("Created diff image %s, wht map %s, and bpx mask %s"%(
+                        diffim_masked, diffwht, diffbpx ) )
                 os.chdir( topdir )
+            pass # end for epoch in epochlist
+        pass # end for filter in filterlist
     return 0
 
 def mkparser():
@@ -591,6 +595,7 @@ def mkparser():
     drizpar.add_argument('--wht_type', metavar='ERR', type=str, help='Type of the weight image.', default='ERR')
 
     diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")
+    diffpar.add_argument('--singlesubs', action='store_true', help='Make diff images from the individual-exposure _single_sci.fits images.', default=False )
     diffpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
     diffpar.add_argument('--tempfilters', metavar='X,Y', type=str, help='Make a composite template by combining images in these filters.', default=None )
 
@@ -633,6 +638,7 @@ def main() :
              imsize_arcsec=argv.imsize,
              pixscale=argv.pixscale, pixfrac=argv.pixfrac,
              wht_type=argv.wht_type, clean=argv.clean,
+             singlesubs=argv.singlesubs,
              clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
     return 0
 
