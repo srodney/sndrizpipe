@@ -153,17 +153,20 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix )
         # give the output single_sci.fits files some more helpful names
         for fltfile in fltlist :
-            scifile0 = fltfile.replace('_flt.fits','_single_sci.fits')
+            if fltfile.endswith('_flc.fits') :
+                fltsfx = '_flc.fits'
+            else :
+                fltsfx = '_flt.fits'
+            scifile0 = fltfile.replace(fltsfx,'_single_sci.fits')
             scifile1 = outroot + '_' + scifile0
             if not os.path.isfile( scifile0 ) :
                 raise exceptions.RuntimeError('Missing _single_sci.fits file %s'%scifile0)
             os.rename( scifile0, scifile1 )
             whtfile0 = scifile0.replace( '_sci.fits','_wht.fits')
             whtfile1 = scifile1.replace( '_sci.fits','_wht.fits')
-            if os.path.isfile(whtfile0) : os.rename( whtfile0, whtfile1 )
+            os.rename( whtfile0, whtfile1 )
             scilist.append( scifile1 )
             whtlist.append( whtfile1 )
-
             if clean :
                 maskfile1 = scifile0.replace( '_single_sci.fits','_sci1_single_mask.fits')
                 if os.path.isfile( maskfile1 ) : os.remove( maskfile1 )
