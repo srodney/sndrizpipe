@@ -564,6 +564,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if clean > 3 :
         if verbose :
             print("Clean level 4 : remove single-visit 'nat' drizzle and tweakreg products")
+            if clean > 4 :
+                print("Clean level 5 : remove all temporary files (race condition possible when processing multiple filters in the same epoch simultaneously)")
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
             thisepoch = explistFEV[0].epoch
@@ -592,6 +594,16 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                              glob.glob( natroot+'_*.list' )
                 for natcoo in natcoolist :
                     os.remove( natcoo )
+            if clean > 4 :
+                # Nuclear option : causes a race condition when processing
+                # with separate filters in the same epoch on separate processes
+                tmpmasklist = glob.glob( 'tmp*staticMask.fits' )
+                for tmpmask in tmpmasklist :
+                    if os.path.exists( tmpmask ):
+                        os.remove( tmpmask )
+                if os.path.exists('OrIg_files') :
+                    shutil.rmtree( 'OrIg_files' )
+
             os.chdir( topdir )
 
 
@@ -613,13 +625,14 @@ def mkparser():
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
-    parser.add_argument('--clean', type=int, choices=[0,1,2,3,4], default=1,
-                        help='Clean up cruft.'
-                         " 0 : Keep all intermediate files."
-                         " 1 : Remove intermediate drizzle and diff files, including ctx.fits and sub_sci.fits [the default];"
-                         " 2 : and clear out OrIg_files/*fl?.fits;"
-                         " 3 : and remove last-drizzle flts in epoch sub-dirs;"
-                         " 4 : and delete nat_drz products and tweakreg catalogs.")
+    parser.add_argument('--clean', type=int, choices=[0,1,2,3,4,5], default=1,
+                        help='Clean up cruft: '
+                         " [0] Keep all intermediate files. "
+                         " [1] Remove intermediate drizzle and diff files, including ctx.fits and sub_sci.fits (the default); "
+                         " [2] and clear out OrIg_files/*fl?.fits; "
+                         " [3] and remove last-drizzle flts in epoch sub-dirs; "
+                         " [4] and delete nat_drz products and tweakreg catalogs; "
+                         " [5] and remove any tmp*staticMask.fits files (Warning: race conditions possible).")
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
@@ -669,10 +682,10 @@ def mkparser():
 
     drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
     drizpar.add_argument('--drizcr', type=int, default=1, choices=[0,1,2],
-                         help='Astrodrizzle cosmic ray rejection stage.'
-                         "\n0 : don't do any new CR rejection "
-                         '\n1 : run CR rejection only within the visit. [the default]'
-                         '\n2 : also flag CRs at the multi-visit drizzle stage.')
+                         help='Astrodrizzle cosmic ray rejection stage: '
+                         "[0] don't do any new CR rejection; "
+                         '[1] run CR rejection only within the visit (the default); '
+                         '[2] also flag CRs at the multi-visit drizzle stage.')
     drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
@@ -706,7 +719,8 @@ def main() :
         argv.nbright = 1
         argv.minobj = 1
         argv.shiftonly = True
-        # argv.mjdmin = 9999999
+        if not argv.mjdmin:
+            argv.mjdmin = 9999999
 
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
