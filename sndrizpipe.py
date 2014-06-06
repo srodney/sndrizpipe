@@ -146,6 +146,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         refdrzdir = '%s.refim'%outroot
         refimbasename = '%s_wcsref_drz_sci.fits'%(outroot)
         refim = os.path.abspath( os.path.join( refdrzdir, refimbasename ) )
+        if os.path.exists( refim.replace('_drz_sci','_drc_sci') ):
+            refim = refim.replace('_drz_sci','_drc_sci')
 
     if refcat : refcat = os.path.abspath(refcat)
 
@@ -242,7 +244,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 os.chmod( os.path.join(refdrzdir,fltfile), PERMISSIONS )
             fltlistRI = [ exp.filename for exp in explistRI ]
 
-            refimroot = refim[:refim.find('_drz_sci.fits')]
+            refimbasename = os.path.basename( refim )
+            drzpt = max( refimbasename.find('_drz_sci.fits'),refimbasename.find('_drc_sci.fits') )
+            refimroot = refimbasename[:drzpt]
             os.chdir( refdrzdir )
 
             # drizzle the ref image using firstDrizzle :
@@ -250,8 +254,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # pixscale and pixfrac based on number of flts)
             refdrzsci, refimwht = drizzle.firstDrizzle(
                 fltlistRI, refimroot, driz_cr=drizcr, clean=clean )
-            #assert( refdrzsci == refim )
-            refim = refdrzsci
+            refim = os.path.join( os.path.abspath(refdrzdir),os.path.basename(refdrzsci) )
 
             if refcat :
                 # Update the WCS header info in the ref image to match the
