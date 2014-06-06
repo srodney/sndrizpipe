@@ -55,9 +55,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # Register to a given image or  epoch, visit and filter
               doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
               # Drizzle registered flts by epoch and filter
-              dodriz2=False, singlesubs=False,
+              dodriz2=False, singlesci=False,
               # make diff images
-              dodiff=False, tempepoch=0, tempfilters=None,
+              dodiff=False, tempepoch=0, tempfilters=None, singlesubs=False,
               # source detection and matching
               interactive=False, threshold=5, nbright=None,
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
@@ -432,7 +432,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
-                singlesci=singlesubs, clean=clean,
+                singlesci=(singlesubs or singlesci), clean=clean,
                 clobber=clobber, verbose=verbose, debug=debug  )
 
             os.chdir( topdir )
@@ -503,7 +503,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 regscilist = [regsci]
                 subscilist = [ outrootFE + "-e%02i_sub_sci.fits"%tempepoch ]
 
-                if singlesubs :
+                if singlesubs or singlesci:
                     for exp in explistFE :
                         singlesci = '%s_reg_%s_single_sci.fits'%( outrootFE, exp.rootname )
                         subsci = '%s-e%02i_%s_single_sub_sci.fits'%( outrootFE, tempepoch, exp.rootname )
@@ -680,9 +680,10 @@ def mkparser():
     drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
     drizpar.add_argument('--wht_type', metavar='ERR', type=str, help='Type of the weight image.', default='ERR')
+    drizpar.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
 
     diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")
-    diffpar.add_argument('--singlesubs', action='store_true', help='Make diff images from the individual-exposure _single_sci.fits images.', default=False )
+    diffpar.add_argument('--singlesubs', action='store_true', help='Make diff images from the individual-exposure _single_sci.fits images. Also sets --singlesci.', default=False )
     diffpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
     diffpar.add_argument('--tempfilters', metavar='X,Y', type=str, help='Make a composite template by combining images in these filters.', default=None )
 
@@ -733,6 +734,7 @@ def main() :
              pixscale=argv.pixscale, pixfrac=argv.pixfrac,
              wht_type=argv.wht_type, clean=argv.clean,
              singlesubs=argv.singlesubs,
+             singlesci=(argv.singlesci or argv.singlesubs),
              clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
     return 0
 
