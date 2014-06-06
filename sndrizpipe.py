@@ -118,20 +118,21 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
     # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
+    if not epochlistfile :
+        epochlistfile =  "%s_epochs.txt"%outroot
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
     if not len( fltlist ) : 
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
-    explist_all = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
-    
-    if not epochlistfile :
-        epochlistfile =  "%s_epochs.txt"%explist_all[0].outroot
+
     if os.path.exists( epochlistfile ) :
-        print( "%s exists. Adopting existing epoch sorting."%epochlistfile )
-        exposures.read_epochs( explist_all, epochlistfile )
+        if verbose: print( "%s exists. Adopting existing exposure list and epoch sorting."%epochlistfile )
+        explist_all = exposures.read_explist( epochlistfile )
         exposures.print_epochs( explist_all, outfile=None,
                                 verbose=verbose, clobber=False,
                                 onlyfilters=None, onlyepochs=None )
     else :
+        if verbose: print( "Generating exposure list and epoch sorting from %s/*fl?.fits."%fltdir )
+        explist_all = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
         exposures.define_epochs( explist_all, epochspan=epochspan,
                                  mjdmin=mjdmin, mjdmax=mjdmax )
         exposures.print_epochs( explist_all, outfile=epochlistfile,
@@ -202,14 +203,12 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                                       if exp.epoch==refepoch ] )[0]
             reffilter = reffilter.lower()
             
-            # if refvisit is not set, then find the maximum depth visit and use that
+            # if refvisit is not set, then use the visit with the most exposures
             if not refvisit :
                 #visits, exp_times, visit_depth = np.array( ([], [], []) )
                 explistRIvisfind = [ exp for exp in explist_all
                         if (exp.epoch==refepoch and exp.filter==reffilter) ]
                 pidvisits = [exp.pidvisit for exp in explistRIvisfind ]
-                exp_times = np.array([exp.exposure_time
-                                      for exp in explistRIvisfind ])
                 unique_visits = np.unique( pidvisits )
                 if len(unique_visits)==1:
                     refvisit = unique_visits[0]
@@ -218,11 +217,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                         "No visits satisfy the refimage requirements:\n"+\
                         "  filter = %s     epoch = %s"%(reffilter,refepoch) )
                 else :
-                    visindices = [ np.where(np.char.equal(pidvisits,vis))[0]
-                                   for vis in unique_visits ]
-                    visit_depth = np.array( [ np.sum(exp_times[ivis])
-                                              for ivis in visindices ] )
-                    ideepest  = np.argmax( visit_depth )
+                    Nexp_per_visit = [ len(np.where(np.char.equal(pidvisits,vis))[0])
+                                       for vis in unique_visits ]
+                    ideepest  = np.argmax( Nexp_per_visit )
                     refvisit = unique_visits[ideepest]
             refvisit = refvisit.upper()
             if refvisit.find('.') > 0 :
@@ -623,6 +620,8 @@ def mkparser():
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
+    parser.add_argument('--singlestar', action='store_true', help='Shortcut for drizzling standard star images with only a single bright source. Equivalent to "--refnbright 1 --minobj 1 --nbright 1 --shiftonly"', default=False)
+
     proc = parser.add_argument_group("Processing stages")
     proc.add_argument('--dosetup', action='store_true', help='(1) copy flt files into epoch subdirs', default=False)
     proc.add_argument('--dorefim', action='store_true', help='(2) build the WCS ref image', default=False)
@@ -697,6 +696,13 @@ def main() :
         import testpipe
         testpipe.colfaxtest( getflts=True, runpipeline=True )
         return 0
+
+    if argv.singlestar :
+        argv.refnbright = 1
+        argv.nbright = 1
+        argv.minobj = 1
+        argv.shiftonly = True
+        # argv.mjdmin = 9999999
 
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),

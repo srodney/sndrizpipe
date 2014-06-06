@@ -52,26 +52,23 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
                                    exp.mjd) )
     return(explist)
 
-def read_epochs( explist, epochlistfile ):
-    """Read the epoch sorting scheme from epochlistfile, apply it to
-    the Exposures in explist (i.e. update their .epoch parameters) and
-    return the modified explist.
-
-    Caution : calling this function actually updates the input explist.
+def read_explist( epochlistfile, outroot=None ):
+    """Read the exposure list and epoch sorting scheme from epochlistfile,
+    generating a new list of Exposures and return that explist.
     """
-    from astropy.io import ascii
-    epochtable = ascii.read( epochlistfile )
-    rootnamelist = epochtable['rootname'].tolist()
-    epochlist = epochtable['epoch']
-    for exp in explist :
-        try:
-            iexp = rootnamelist.index(exp.rootname)
-        except ValueError:
-            continue
-        exp.epoch = epochlist[iexp]
+    import os
+    if outroot is None :
+        outroot = os.path.basename( epochlistfile ).split('_')[0]
+    explist = []
+    fin = open( epochlistfile )
+    linelist = fin.readlines()
+    for line in linelist :
+        line = line.strip()
+        if line.startswith('#') : continue
+        if len(line)==0 : continue
+        explist.append( Exposure(line,outroot) )
     # Sort the exposure list by epoch, filter, visit, and MJD
-    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
-                                   exp.mjd ) )
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit, exp.mjd ) )
     return(explist)
 
 def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilters=None, onlyepochs=None ):
@@ -200,14 +197,60 @@ class Exposure( object ):
             self.initFromFile( initstr, outroot=outroot,
                                targetradec=targetradec )
         else :
-            self.initFromStr( initstr, outroot=outroot,
-                              targetradec=targetradec )
+            self.initFromStr( initstr, outroot )
 
 
-    def initFromStr(self, fltstr, outroot='TARGNAME', targetradec=[None,None] ):
+    def initFromStr(self, fltstr, outroot ):
         """ Initialize an Exposure object from a string. Specifically,
-        a single row from the _epochs.txt file.
+        a single row from the _epochs.txt file. e.g. :
+             ich319ngq  13575  19  ng  f110w    01 56686.1
         """
+        import os
+
+        strlist = fltstr.split()
+        self.rootname = strlist[0]
+        self.pid = int(strlist[1])
+        self.visit = strlist[2]
+        self.expid = strlist[3]
+        self.filtername = strlist[4]
+        self.filter = strlist[4]
+        self.epoch = int(strlist[5])
+        self.mjd = float(strlist[6])
+
+        fltfile =  self.rootname + '_flt.fits'
+        fltdir = outroot + '.flt'
+        assert( os.path.isdir( fltdir ) )
+
+        flcfile = os.path.join( fltdir, self.rootname+'_flc.fits')
+        if os.path.isfile( flcfile ) :
+            filename = flcfile
+        else :
+            filename = flcfile.replace( 'flc.fits','flt.fits' )
+        assert( os.path.exists(filename))
+        self.filename = os.path.basename( filename )
+        self.filepath = os.path.abspath( filename )
+        self.outroot = outroot
+
+        if 'flt.fits' in self.filename :
+            self.fltsuffix = 'flt'
+            self.drzsuffix = 'drz'
+        elif 'flc.fits' in self.filename :
+            self.fltsuffix = 'flc'
+            self.drzsuffix = 'drc'
+
+        self.pidvisit = '%i_%s'%(self.pid, self.visit)
+
+        # 2-digits uniquely identifying this visit and this exposure
+        # within this orbit, from the HST filename
+        self.viscode = self.rootname[4:6].upper()
+        assert( self.expid == self.rootname[-3:-1] )
+
+        if self.epoch==-1 :
+            self.ontarget = False
+        else :
+            self.ontarget=True
+
+
 
     def initFromFile(self, filename, outroot='TARGNAME', targetradec=[None,None] ):
         """ Initialize an Exposure object from an flt.fits file.
