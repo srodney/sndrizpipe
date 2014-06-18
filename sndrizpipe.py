@@ -59,6 +59,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               dodriz2=False, singlesci=False,
               # make diff images
               dodiff=False, tempepoch=0, tempfilters=None, singlesubs=False,
+              # make multi-epoch stack images
+              dostack=False,
               # source detection and matching
               interactive=False, threshold=5, nbright=None,
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
@@ -120,6 +122,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         doreg=True
         dodriz2=True
         dodiff=True
+        dostack=True
 
     # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
@@ -553,6 +556,53 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             pass # end for epoch in epochlist
         pass # end for filter in filterlist
 
+    # STAGE 7
+    # Drizzle together all specified non-template epochs into a single stack
+    # e.g. for use in defining the source position
+    if dostack :
+        if verbose :
+            print("sndrizpipe : (7) STACK : stack together source images.")
+        topdir = os.path.abspath( '.' )
+        stackdir = '%s.stack'%outroot
+        if not os.path.isdir( stackdir ):
+            os.mkdir( stackdir )
+        for filter in filterlist :
+            if onlyfilters and filter not in onlyfilters : continue
+            fltlistStack = []
+            for epoch in epochlist :
+                if onlyepochs and epoch not in onlyepochs : continue
+                if epoch == tempepoch : continue
+                explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
+                if len(explistFE)==0 : continue
+                epochdirFE = explistFE[0].epochdir
+                fltlistStack += [ os.path.join(epochdirFE,exp.filename) for exp in explistFE ]
+            for flt in fltlistStack :
+                if not os.path.exists( os.path.join(stackdir, os.path.basename(flt))) :
+                    shutil.copy( flt, stackdir )
+            fltlistStack = [ os.path.basename( flt ) for flt in fltlistStack ]
+            outrootStack = outroot + '_%s_stack'%filter.lower()
+            outsciStack = os.path.join( stackdir, outrootStack+'_drz_sci.fits')
+            if os.path.isfile( outsciStack ) :
+                print(" Stacked image %s already exists "% outsciStack )
+                if not clobber :
+                    print(" Not clobbering. ")
+                    continue
+            if verbose :
+                if onlyepochs : epochstr = ','.join( [ str(ep) for ep in onlyepochs ] ).rstrip(',')
+                else : epochstr = 'ALL'
+                print(" Constructing stacked image %s_drz_sci.fits from epochs %s"%(
+                    outrootStack,epochstr) )
+            os.chdir( stackdir )
+            outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
+                fltlistStack, outrootStack, refimage=None,
+                ra=ra, dec=dec, rot=rot,
+                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                pixscale=pixscale, pixfrac=pixfrac, driz_cr=0,
+                singlesci=False, clean=clean,
+                clobber=clobber, verbose=verbose, debug=debug  )
+            os.chdir( topdir )
+            pass # end for filter in filterlist
+
     if clean > 1 :
         topdir = os.path.abspath( '.' )
         if verbose :
@@ -660,6 +710,7 @@ def mkparser():
     proc.add_argument('--doreg', action='store_true', help='(4) run tweakreg to align with refimage', default=False)
     proc.add_argument('--dodriz2', action='store_true', help='(5) second astrodrizzle pass (registered)', default=False)
     proc.add_argument('--dodiff', action='store_true', help='(6) subtract and mask to make diff images', default=False)
+    proc.add_argument('--dostack', action='store_true', help='(7) construct a multi-epoch stack image', default=False)
     proc.add_argument('--doall', action='store_true', help='Run all necessary processing stages', default=False)
 
     sortpar = parser.add_argument_group( "(1) Settings for epoch sorting stage")
@@ -735,7 +786,7 @@ def main() :
              doall=argv.doall,
              dosetup=argv.dosetup, dorefim=argv.dorefim,
              dodriz1=argv.dodriz1, doreg=argv.doreg,
-             dodriz2=argv.dodriz2, dodiff=argv.dodiff,
+             dodriz2=argv.dodriz2, dodiff=argv.dodiff, dostack=argv.dostack,
              drizcr=argv.drizcr, intravisitreg=argv.intravisitreg,
              refim=argv.refimage, refepoch=argv.refepoch,
              refvisit=argv.refvisit, reffilter=argv.reffilter,
