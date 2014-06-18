@@ -53,7 +53,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               # Single Visit tweakreg/drizzle pass : 
               dodriz1=False, drizcr=1, intravisitreg=False,
               # Register to a given image or  epoch, visit and filter
-              doreg=False, refim=None, refepoch=None, refvisit=None, reffilter=None, 
+              doreg=False, singlestar=False,
+              refim=None, refepoch=None, refvisit=None, reffilter=None,
               # Drizzle registered flts by epoch and filter
               dodriz2=False, singlesci=False,
               # make diff images
@@ -97,13 +98,17 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         onlyfilters = [ filt[:5].lower() for filt in onlyfilters ]
     if type(onlyepochs) in [str,int,float] :
         onlyepochs = [ int(ep) for ep in str(onlyepochs).split(',') ]
-
     if tempfilters is not None and len(onlyfilters) != 1 :
         raise exceptions.RuntimeError(
             'You specified filter(s) to combine/scale for the template epoch'
             'but you did not limit the processing to a single filter.'
             "If you use --tempfilters then you must also specify a "
             "single filter for processing with '--filters X'")
+    if singlestar and ((ra is None) or (dec is None)) :
+        raise exceptions.RuntimeError(
+            'If you set the --singlestar flag for processing a single '
+            '(standard) star then you MUST also provide a target RA and '
+            'DEC with the --ra and --dec options.' )
 
     topdir = os.path.abspath( '.' )
     fltdir = outroot + '.flt' 
@@ -180,7 +185,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
     # STAGE 2 :
     # Construct the WCS reference image
-    if dorefim :
+    if dorefim and not singlestar :
         refimclobber = clobber and (reffilter or refepoch or refvisit)
         if verbose :
             print("sndrizpipe : (2) REFIM : Constructing WCS ref image.")
@@ -293,7 +298,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
     # If refnbright was provided, then we must make an RA,Dec reference
     # catalog when one does not already exist
-    if refnbright and not refcat :
+    if refnbright and not refcat and not singlestar :
         assert( os.path.exists( refim ) )
         refdrzdir = os.path.dirname( refim )
         os.chdir( refdrzdir)
@@ -352,18 +357,19 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # Run tweakreg to register all the single-visit drz images
     # to a common WCS defined by the refcat/refim, updating the drz file headers.
     # Then use tweakback to propagate that back into the flt files
-    if doreg : 
+    if doreg :
         if verbose :
-            print("sndrizpipe : (4) REG : running tweakreg.")
+            print("sndrizpipe : (4) REG : registering images.")
 
-        refim = os.path.abspath( refim )
-        if not os.path.exists( refim ):
-            raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
+        if not singlestar :
+            refim = os.path.abspath( refim )
+            if not os.path.exists( refim ):
+                raise exceptions.RuntimeError("No refim file %s!  Maybe you should re-run with dorefim=True."%refim)
 
-        # Fix the output  ra and dec center point if not provided by the user.
-        if not ra and not dec :
-            ra = pyfits.getval( refim, "CRVAL1" )
-            dec = pyfits.getval( refim, "CRVAL2" )
+            # Fix the output  ra and dec center point if not provided by the user.
+            if not ra and not dec :
+                ra = pyfits.getval( refim, "CRVAL1" )
+                dec = pyfits.getval( refim, "CRVAL2" )
 
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
@@ -378,21 +384,30 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             outsciFEV = '%s_%s_sci.fits'%(outrootFEV,explistFEV[0].drzsuffix)
 
             os.chdir( epochdir )
+
             if not os.path.exists( outsciFEV ) :
                 exceptions.RuntimeError( "Missing %s."%outsciFEV )
-
-            # register to the ref image and ref catalog
             origwcs = pyfits.getval( outsciFEV,'WCSNAME').strip()
-            wcsname = register.RunTweakReg(
-                outsciFEV, wcsname='REFIM:%s'%os.path.basename(refim),
-                refim=refim, refcat=refcat,
-                searchrad=searchrad, threshold=threshold, minobj=minobj,
-                peakmin=peakmin, peakmax=peakmax,
-                # fluxmin=fluxmin, fluxmax=fluxmax,
-                fitgeometry=fitgeometry, nbright=nbright, clean=clean,
-                refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
-                nclip=nclip, sigmaclip=sigmaclip,
-                verbose=verbose,interactive=interactive, clobber=clobber, debug=debug )
+
+            if singlestar :
+                # Special case for handling standard star images:
+                wcsname=register.SingleStarReg( outsciFEV, ra, dec,
+                                                refim=None, threshmin=threshold,
+                                                peakmin=peakmin, peakmax=peakmax,
+                                                wcsname='SINGLESTAR:%.6f,%.6f'%(ra,dec))
+
+            else :
+                # register to the ref image and ref catalog
+                wcsname = register.RunTweakReg(
+                    outsciFEV, wcsname='REFIM:%s'%os.path.basename(refim),
+                    refim=refim, refcat=refcat,
+                    searchrad=searchrad, threshold=threshold, minobj=minobj,
+                    peakmin=peakmin, peakmax=peakmax,
+                    # fluxmin=fluxmin, fluxmax=fluxmax,
+                    fitgeometry=fitgeometry, nbright=nbright, clean=clean,
+                    refnbright=refnbright, rfluxmin=rfluxmin, rfluxmax=rfluxmax,
+                    nclip=nclip, sigmaclip=sigmaclip,
+                    verbose=verbose,interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
             tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs,
@@ -636,7 +651,7 @@ def mkparser():
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
-    parser.add_argument('--singlestar', action='store_true', help='Shortcut for drizzling standard star images with only a single bright source. Equivalent to "--refnbright 1 --minobj 1 --nbright 1 --shiftonly"', default=False)
+    parser.add_argument('--singlestar', action='store_true', help='Special case for registering images with only a single bright source, e.g. standard stars.', default=False)
 
     proc = parser.add_argument_group("Processing stages")
     proc.add_argument('--dosetup', action='store_true', help='(1) copy flt files into epoch subdirs', default=False)
@@ -714,14 +729,6 @@ def main() :
         testpipe.colfaxtest( getflts=True, runpipeline=True )
         return 0
 
-    if argv.singlestar :
-        argv.refnbright = 1
-        argv.nbright = 1
-        argv.minobj = 1
-        argv.shiftonly = True
-        if not argv.mjdmin:
-            argv.mjdmin = 9999999
-
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
              onlyepochs=(argv.epochs or []),
@@ -741,6 +748,7 @@ def main() :
              searchrad=argv.searchrad, threshold=argv.threshold,
              nclip=argv.nclip, sigmaclip=argv.sigmaclip,
              minobj=argv.minobj, shiftonly=argv.shiftonly,
+             singlestar=argv.singlestar,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
              ra=argv.ra, dec=argv.dec, rot=argv.rot,

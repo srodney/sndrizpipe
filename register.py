@@ -188,10 +188,9 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
     return( wcsname )
 
 
-# noinspection PyUnreachableCode
-def SingleStarReg( imfile, refimfile, xy=[], xyref=[], wcsname='SINGLESTAR',
-                   computesig=True, skysigma=0,
-                   threshold=4.0, peakmin=None, peakmax=None,
+def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
+                   computesig=False, refim=None,
+                   threshmin=4.0, peakmin=None, peakmax=None,
                    nsigma=1.5, fluxmin=None, fluxmax=None, sciext=None,
                    verbose=True, clobber=True ):
     """ Update the WCS of imfile so that it matches the WCS of the refimfile,
@@ -203,57 +202,75 @@ def SingleStarReg( imfile, refimfile, xy=[], xyref=[], wcsname='SINGLESTAR',
     """
     from astropy.io import ascii
     from drizzlepac.updatehdr import updatewcs_with_shift
+    from numpy import unique
 
+    if refim is None : refim = imfile
+    if computesig==False :
+        skysigma = getskysigma( imfile )
+        if verbose : print("sndrizipipe.register.SingleStarReg: "
+                           " Manually computed sky sigma for %s as %.5e"%(imfile,skysigma))
+    else :
+        skysigma=0.0
+
+    # locate stars in imfile, pick out the brightest one
     topdir = os.path.abspath( '.' )
-    if not xy :
-        # locate stars in imfile, pick out the brightest one
-        imfiledir = os.path.dirname( imfile )
-        imfilebase = os.path.basename( imfile )
-        os.chdir( imfiledir )
-        xycatfile = mkSourceCatalog(
-            imfilebase, computesig=computesig, skysigma=skysigma, nsigma=nsigma,
-            threshold=threshold, peakmin=peakmin, peakmax=peakmax,
-            fluxmin=fluxmin, fluxmax= fluxmax  )[0]
-        xycat = ascii.read( xycatfile )
-        ibrightest = xycat['col3'].argmax()
-        xy = [ xycat['col1'][ibrightest], xycat['col2'][ibrightest] ]
-        os.chdir( topdir )
-    if not xyref :
-        # locate stars in refimfile, pick out the brightest one
-        refimfiledir = os.path.dirname( refimfile )
-        refimfilebase = os.path.basename( refimfile )
-        os.chdir( refimfiledir )
-        xyrefcatfile = mkSourceCatalog(
-            refimfilebase, computesig=computesig, skysigma=skysigma, nsigma=nsigma,
-            threshold=threshold, peakmin=peakmin, peakmax=peakmax,
-            fluxmin=fluxmin, fluxmax= fluxmax  )[0]
-        xyrefcat = ascii.read( xyrefcatfile )
-        ibrightest = xyrefcat['col3'].argmax()
-        xyref = [ xyrefcat['col1'][ibrightest], xyrefcat['col2'][ibrightest] ]
-        os.chdir( topdir )
+    imfiledir = os.path.dirname( os.path.abspath(imfile) )
+    imfilebase = os.path.basename( imfile )
+    os.chdir( imfiledir )
 
-    #return( np.array([xy]), np.array([xyref]) )
+    # Iterate the source-finding algorithm with progressively smaller threshold
+    # values.  This helps to ensure that we correctly locate the single bright
+    # source in the image
+    xycatfile = None
+    threshold = 200.
+    while threshold >= threshmin :
+        try :
+            xycatfile = mkSourceCatalog(
+                imfilebase, computesig=computesig, skysigma=skysigma, nsigma=nsigma,
+                threshold=threshold, peakmin=peakmin, peakmax=peakmax,
+                fluxmin=fluxmin, fluxmax= fluxmax  )[0]
+            # The source finder succeeded!
+            break
+        except NameError :
+            # the source finder failed, try again with a lower threshold
+            threshold /= 2.
+            continue
+    if xycatfile is None :
+        raise exceptions.RuntimeError(
+            "Failed to generate a clean source catalog for %s"%imfile + \
+            " using threshmin = %.3f"%threshmin )
+
+    xycat = ascii.read( xycatfile )
+    if verbose :
+        print("Located %i sources with threshold=%.1f sigma"%(len(xycat),threshold))
+
+    os.chdir( topdir )
+
+    ibrightest = xycat['col3'].argmax()
+    xy = [ xycat['col1'][ibrightest], xycat['col2'][ibrightest] ]
+
+    # locate the appropriate extensions for updating
+    hdulist = pyfits.open( imfile )
+    sciextlist = [ hdu.name for hdu in hdulist if 'WCSAXES' in hdu.header ]
+    assert(len(sciextlist)>0)
+
+    # convert the target position from ra,dec to x,y
+    imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=(sciextlist[0],1) )
+    xyref = imwcs.wcs_sky2pix( ra, dec , 1)
+
     # compute the pixel shift from xy to xyref
-    xshift = xyref[0] - xy[0]
-    yshift = xyref[1] - xy[1]
+    xshift = xy[0] - xyref[0]
+    yshift = xy[1] - xyref[1]
 
-    # update imfile with the WCS shift
-    if not sciext :
-        image = pyfits.open( imfile )
-        extnamelist = [ ext.name.upper() for ext in image ]
-        if 'SCI' in extnamelist :
-            sciext='SCI'
-        elif 'PRIMARY' in extnamelist :
-            sciext='PRIMARY'
-        else :
-            raise exceptions.RuntimeError(
-                "For the image %s you must provide the sciext keyword."%(
-                    imfile ) )
-
-    updatewcs_with_shift(imfile, refimfile, wcsname=wcsname,
-                         rot=0.0, scale=1.0, xsh=xshift, ysh=yshift,
-                         fit=None, xrms=None, yrms=None, verbose=verbose,
-                         force=clobber, sciext=sciext )
+    for sciext in unique(sciextlist):
+        print("Updating %s ext %s with xshift,yshift = %.5f %.5f"%(
+            imfile,sciext, xshift, yshift ))
+        updatewcs_with_shift(imfile, refim, wcsname=wcsname,
+                             rot=0.0, scale=1.0, xsh=xshift, ysh=yshift,
+                             fit=None, xrms=None, yrms=None, verbose=verbose,
+                             force=clobber, sciext=sciext )
+    hdulist.close()
+    return( wcsname )
 
 
 def clearAltWCS( fltlist ) : 
@@ -346,6 +363,7 @@ def mkSourceCatalog( imfile, computesig=True, skysigma=0,
     return( catfilelist )
 
 
+
 def writeRADecCatalog(cat,filename):
     """ Write out the RA,Dec positions from a drizzlepac Catalog
     object into a text file.
@@ -393,7 +411,7 @@ def getconvwidth( fitsfile ):
         conv_width = 2.5
     return( conv_width )
 
-def getskysigma( filelist, usemode=False ):
+def getskysigma( filelist, usemode=False, nclip=3 ):
     """ Compute the median sky noise for the given image or list of images.
     The default uses the skysigma algorithm as stated in the drizzlepac manual (v1.0, 2012)
     instead of the one implemented in drizzlepac/catalogs.py.  That is, we
@@ -402,6 +420,8 @@ def getskysigma( filelist, usemode=False ):
     """
     from stsci import imagestats
     from numpy import median, sqrt, abs
+    if isinstance( filelist, str ):
+        filelist = [ filelist ]
 
     modelist, stddevlist = [], []
     for file in filelist :
@@ -416,7 +436,7 @@ def getskysigma( filelist, usemode=False ):
         for iext in iextlist:
             ext = hdulist[ iext ]
             istats = imagestats.ImageStats(
-                ext.data, nclip=3, fields='mode,stddev', binwidth=0.01 )
+                ext.data, nclip=nclip, fields='mode,stddev', binwidth=0.01 )
             stddevlist.append( istats.stddev )
             modelist.append( abs( istats.mode ))
     if usemode :
