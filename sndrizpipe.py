@@ -124,6 +124,11 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         dodiff=True
         dostack=True
 
+    # For single-star registrations, set some useful defaults when the user doesn't
+    if singlestar :
+        if not searchrad : searchrad=10
+        if threshold>0.5 : threshold=0.5 # this becomes threshmin, so we only allow the user to decrease from 0.5
+
     # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
     if not epochlistfile :
@@ -397,7 +402,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 wcsname=register.SingleStarReg( outsciFEV, ra, dec,
                                                 refim=None, threshmin=threshold,
                                                 peakmin=peakmin, peakmax=peakmax,
-                                                wcsname='SINGLESTAR:%.6f,%.6f'%(ra,dec))
+                                                wcsname='SINGLESTAR:%.6f,%.6f'%(ra,dec),
+                                                verbose=verbose )
 
             else :
                 # register to the ref image and ref catalog
@@ -689,6 +695,7 @@ def mkparser():
     parser.add_argument('--epochs', metavar='X,Y,Z', help='Process only these epochs (comma-seperated list)',default='')
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
+    parser.add_argument('--verboselevel', type=int, dest='verbose', help='Turn up the verbosity (0-10).', default=1 )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
     parser.add_argument('--clean', type=int, choices=[0,1,2,3,4,5], default=1,
                         help='Clean up cruft: '
@@ -772,8 +779,6 @@ def mkparser():
 def main() :
     parser = mkparser()
     argv = parser.parse_args()
-
-    # TODO : check that the user has provided a sufficient but non-redundant set of parameters
 
     if argv.dotest :
         import testpipe
