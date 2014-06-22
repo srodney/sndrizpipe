@@ -35,6 +35,15 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     if len(fltlist)==1:
         docombine=False
 
+    # For image sets with fewer than 5 images :
+    # if the exposure time in the image set varies by more than a factor of 10
+    # then disable CR rejection and wipe out existing CR flags, because the
+    # drizzlepac driz_cr step will flag sky noise as CRs.
+    if len(fltlist) < 5 :
+        etimelist = [ pyfits.getval(flt,'EXPTIME') for flt in fltlist ]
+        if max( etimelist ) / min( etimelist ) > 10 :
+            driz_cr = -1
+
     # define the default astrodrizzle parameters for this camera
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
@@ -42,9 +51,9 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False,
-        resetbits=int((driz_cr and docombine) and 4096),
+        resetbits=int((driz_cr<0 or (driz_cr and docombine)) and 4096),
         restore=True, preserve=True, overwrite=False, clean=clean,
-        median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
+        median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
         combine_type='iminmed',
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
@@ -69,7 +78,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
                    singlesci=False, pixscale=None, pixfrac=None, wht_type='ERR',
-                   clean=True, clobber=False, verbose=True, debug=False  ) :
+                   clean=True, clobber=False, verbose=True, debug=False ) :
     """ 
     Run astrodrizzle on a pile of flt images.
     
@@ -88,6 +97,15 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     hdulist=pyfits.open(fltlist[0])
     hdr=hdulist[0].header
     hdulist.close()
+
+    # For image sets with fewer than 5 images :
+    # if the exposure time in the image set varies by more than a factor of 10
+    # then disable CR rejection and wipe out existing CR flags, because the
+    # drizzlepac driz_cr step will flag sky noise as CRs.
+    if len(fltlist) < 5 :
+        etimelist = [ pyfits.getval(flt,'EXPTIME') for flt in fltlist ]
+        if max( etimelist ) / min( etimelist ) > 10 :
+            driz_cr = -1
 
     # define the default astrodrizzle parameters for this camera
     # Note that we fake the number of exposures to be 2, so that we get
@@ -117,7 +135,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, updatewcs=False, resetbits=0,
         restore=False, preserve=True, overwrite=True, clean=clean,
-        median=docombine, blot=docombine, driz_cr=(driz_cr and docombine),
+        median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
         driz_sep_bits=drizpar['drizbits'],

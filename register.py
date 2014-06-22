@@ -323,7 +323,7 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     # If the new centroid position differs substantially from the original
     # ndfind position, then update the found source position
     # (i.e. in cases of catastrophic ndfind failure)
-    if dxcntrd>0.5 or dycntrd>0.5 :
+    if (abs(dxcntrd)>0.5) or (abs(dycntrd)>0.5) :
         xfnd = xcntrd
         yfnd = ycntrd
 

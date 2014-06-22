@@ -455,9 +455,10 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac, driz_cr=(drizcr>1),
+                pixscale=pixscale, pixfrac=pixfrac,
+                driz_cr=((drizcr>1) or (drizcr<1 and drizcr)),
                 singlesci=(singlesubs or singlesci), clean=clean,
-                clobber=clobber, verbose=verbose, debug=debug  )
+                clobber=clobber, verbose=verbose, debug=debug )
 
             os.chdir( topdir )
 
@@ -605,7 +606,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=0,
                 singlesci=False, clean=clean,
-                clobber=clobber, verbose=verbose, debug=debug  )
+                clobber=clobber, verbose=verbose, debug=debug )
             os.chdir( topdir )
             pass # end for filter in filterlist
 
@@ -754,8 +755,9 @@ def mkparser():
     regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
     drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
-    drizpar.add_argument('--drizcr', type=int, default=1, choices=[0,1,2],
+    drizpar.add_argument('--drizcr', type=int, default=1, choices=[-1,0,1,2],
                          help='Astrodrizzle cosmic ray rejection stage: '
+                         "[-1] remove existing CR flags and don't add any more; "
                          "[0] don't do any new CR rejection; "
                          '[1] run CR rejection only within the visit (the default); '
                          '[2] also flag CRs at the multi-visit drizzle stage.')
