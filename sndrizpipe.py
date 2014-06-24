@@ -601,8 +601,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     outrootStack,epochstr) )
             os.chdir( stackdir )
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
-                fltlistStack, outrootStack, refimage=None,
-                ra=ra, dec=dec, rot=rot,
+                fltlistStack, outrootStack,
+                refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=0,
                 singlesci=False, clean=clean,
@@ -767,7 +767,7 @@ def mkparser():
     drizpar.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
     drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    drizpar.add_argument('--wht_type', metavar='ERR', type=str, help='Type of the weight image.', default='ERR')
+    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP'], default='IVM')
     drizpar.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
 
     diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")

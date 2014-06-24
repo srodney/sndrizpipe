@@ -77,7 +77,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
-                   singlesci=False, pixscale=None, pixfrac=None, wht_type='ERR',
+                   singlesci=False, pixscale=None, pixfrac=None, wht_type='IVM',
                    clean=True, clobber=False, verbose=True, debug=False ) :
     """ 
     Run astrodrizzle on a pile of flt images.
@@ -133,9 +133,11 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
 
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle(
-        fltlist, output=outroot, updatewcs=False, resetbits=0,
+        fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
+        updatewcs=False, build=False, resetbits=0,
         restore=False, preserve=True, overwrite=True, clean=clean,
         median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
+        combine_type='iminmed',
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
         driz_sep_bits=drizpar['drizbits'],
@@ -143,7 +145,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         final_wcs=True, final_pixfrac=pixfrac, final_scale=pixscale,
         final_bits=drizpar['drizbits'],
         final_ra=ra, final_dec=dec, final_rot=rot,
-        final_outnx=imsize_pix, final_outny=imsize_pix, 
+        final_outnx=imsize_pix, final_outny=imsize_pix,
         final_wht_type=wht_type )
                     
     if fltlist[0].find('_flc.fits')>0  : drzsfx = '_drc'
