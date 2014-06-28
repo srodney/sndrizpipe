@@ -48,11 +48,12 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
+    if verbose : print("Drizzling %i flts to make %s."%(len(fltlist),outroot))
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False,
         resetbits=int((driz_cr<0 or (driz_cr and docombine)) and 4096),
-        restore=True, preserve=True, overwrite=False, clean=clean,
+        restore=(not clobber), preserve=True, overwrite=clobber, clean=clean,
         median=docombine, blot=(driz_cr>0 and docombine),
         driz_cr=(driz_cr>0 and docombine),
         combine_type='iminmed',

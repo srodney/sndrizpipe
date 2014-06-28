@@ -364,10 +364,10 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     verbose=verbose, interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
-                wcskey=((intravisitreg and 'INTRAVIS') or ''), clean=clean )
-
+                wcskey=((intravisitreg and 'INTRAVIS') or ''),
+                clobber=clobber, verbose=verbose, clean=clean )
             os.chdir( topdir )
-
+            continue
 
     # STAGE 4 :
     # Run tweakreg to register all the single-visit drz images
@@ -764,7 +764,7 @@ def mkparser():
     drizpar.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
     drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP','ERR'], default='IVM')
+    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP'], default='IVM')
     drizpar.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
 
     diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")
