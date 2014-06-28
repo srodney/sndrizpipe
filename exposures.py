@@ -138,7 +138,7 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
 
     for exp in explist :
         # only copy files for the given filter and epoch
-        if exp.epoch==-1 or not exp.ontarget : continue
+        if exp.epoch<0 or not exp.ontarget : continue
         if onlyfilters and exp.filter not in onlyfilters :
             continue
         if onlyepochs and exp.epoch not in onlyepochs :

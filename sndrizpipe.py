@@ -176,7 +176,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     # that we actually want to process
     explist = []
     for exp in explist_all:
-        if exp.epoch==-1 or not exp.ontarget :
+        if exp.epoch<0 or not exp.ontarget :
             continue
         if onlyfilters and exp.filter not in onlyfilters :
             continue
@@ -616,8 +616,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             if onlyfilters and filter not in onlyfilters : continue
             for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
-                if epoch == tempepoch : continue
                 explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
+                if len(explistFE) == 0 : continue
                 epochdirFE = explistFE[0].epochdir
                 if not os.path.isdir( epochdirFE ) : continue
                 os.chdir( epochdirFE )
@@ -637,6 +637,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 print("Clean level 5 : remove all temporary files (race condition possible when processing multiple filters in the same epoch simultaneously)")
         for FEVgroup in FEVgrouplist :
             explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
+            if len(explistFEV)==0 : continue
             thisepoch = explistFEV[0].epoch
             thisfilter = explistFEV[0].filter
             if onlyepochs and thisepoch not in onlyepochs : continue
