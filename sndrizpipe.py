@@ -68,7 +68,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
               nclip=3, sigmaclip=3.0,
               shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
-              pixscale=None, pixfrac=None, wht_type='ERR',
+              pixscale=None, pixfrac=None, wht_type='IVM',
               clean=False, clobber=False, verbose=True, debug=False ):
     """ 
     Primary pipeline function.  Executes all the intermediate steps: 
@@ -128,6 +128,14 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if singlestar :
         if not searchrad : searchrad=10
         if threshold>0.5 : threshold=0.5 # this becomes threshmin, so we only allow the user to decrease from 0.5
+        if wht_type=='ERR' :
+            print("WARNING :forcing the final_wht_type to EXP instead of ERR"
+                  ' (best for bright sources dominated by poisson noise)' )
+            wht_type = 'EXP'  #
+        if drizcr==1 :
+            print("WARNING :forcing a re-run of driz_cr for multi-visit stacks"
+                  ' (important to to avoid suppressing flux in bright stars)' )
+            drizcr = 2  #
 
     # STAGE 0 : (always runs)
     # get a list of exposures and epochs, sorting flt files into epochs
@@ -356,7 +364,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     verbose=verbose, interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
                 fltlistFEV, outrootFEV, driz_cr=drizcr,
-                wcskey=((intravisitreg and 'INTRAVIS') or '') )
+                wcskey=((intravisitreg and 'INTRAVIS') or ''), clean=clean )
 
             os.chdir( topdir )
 
@@ -425,7 +433,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               
 
     # STAGE 5
-    # Second and final astrodrizzle pass, wherein we rerun
+    # Second astrodrizzle pass, wherein we rerun
     # astrodrizzle to get wcs- and pixel-registered drz images
     # combining all flt files with the same filter and epoch.
     if dodriz2 :
@@ -456,7 +464,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac,
-                driz_cr=((drizcr>1) or (drizcr<1 and drizcr)),
+                combine_type='iminmed', driz_cr=(drizcr>1),
                 singlesci=(singlesubs or singlesci), clean=clean,
                 clobber=clobber, verbose=verbose, debug=debug )
 
@@ -604,8 +612,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistStack, outrootStack,
                 refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac, driz_cr=0,
-                singlesci=False, clean=clean,
+                pixscale=pixscale, pixfrac=pixfrac, driz_cr=drizcr,
+                singlesci=False, clean=clean, combine_type='imedian',
                 clobber=clobber, verbose=verbose, debug=debug )
             os.chdir( topdir )
             pass # end for filter in filterlist
@@ -757,17 +765,17 @@ def mkparser():
     drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
     drizpar.add_argument('--drizcr', type=int, default=1, choices=[-1,0,1,2],
                          help='Astrodrizzle cosmic ray rejection stage: '
-                         "[-1] remove existing CR flags and don't add any more; "
-                         "[0] don't do any new CR rejection; "
-                         '[1] run CR rejection only within the visit (the default); '
-                         '[2] also flag CRs at the multi-visit drizzle stage.')
+                         "[-1] remove CR flags and don't add any more; "
+                         "[0] Keep existing CR flags and don't do any new CR rejection; "
+                         '[1] Remove CR flags and run CR rejection only within the visit (the default); '
+                         '[2] Re-run CR flagging at the multi-visit drizzle and stack stages.')
     drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
     drizpar.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
     drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP'], default='IVM')
+    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP','ERR'], default='IVM')
     drizpar.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
 
     diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")

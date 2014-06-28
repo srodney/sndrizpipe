@@ -53,7 +53,8 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         updatewcs=False, wcskey=wcskey, build=False,
         resetbits=int((driz_cr<0 or (driz_cr and docombine)) and 4096),
         restore=True, preserve=True, overwrite=False, clean=clean,
-        median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
+        median=docombine, blot=(driz_cr>0 and docombine),
+        driz_cr=(driz_cr>0 and docombine),
         combine_type='iminmed',
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
@@ -75,9 +76,10 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     return( ( outscifile, outwhtfile ) )
 
 
-def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='', 
+def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
                    ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
-                   singlesci=False, pixscale=None, pixfrac=None, wht_type='IVM',
+                   singlesci=False, pixscale=None, pixfrac=None,
+                   wht_type='IVM', combine_type='iminmed',
                    clean=True, clobber=False, verbose=True, debug=False ) :
     """ 
     Run astrodrizzle on a pile of flt images.
@@ -130,14 +132,20 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     docombine=True
     if len(fltlist)==1:
         docombine=False
+    combine_nhigh = 0
+    if combine_type in ['median', 'imedian'] :
+        if len(fltlist)>3 : combine_nhigh=1
+        elif len(fltlist)>5 : combine_nhigh=2
+        elif len(fltlist)>9 : combine_nhigh=3
+        elif len(fltlist)>13 : combine_nhigh=4
 
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
-        updatewcs=False, build=False, resetbits=0,
+        updatewcs=False, build=False, resetbits=(driz_cr and 4096),
         restore=False, preserve=True, overwrite=True, clean=clean,
         median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
-        combine_type='iminmed',
+        combine_type=combine_type, combine_nhigh=combine_nhigh,
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
         driz_sep_bits=drizpar['drizbits'],
@@ -283,7 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--imsize', metavar='imsize', type=float, help='Image size [arcsec] of output image (in lieu of a refimage)', default=None)
     parser.add_argument('--pixscale', metavar='pixscale', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
     parser.add_argument('--pixfrac', metavar='pixfrac', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    parser.add_argument('--wht_type', metavar='wht_type', type=str, help='Type of the weight image.', default='ERR')
+    parser.add_argument('--wht_type', metavar='wht_type', type=str, help='Type of the weight image.', default='IVM')
 
     # parser.add_argument('--refdir', metavar='refdir', help='Directory containing HST reference files. The final slash is required.', default='./')
 
