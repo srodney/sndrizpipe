@@ -152,9 +152,12 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
                 print( "Wiping away existing flt file %s"%newfilename)
             if os.path.exists( newfilename ):
                 os.remove( newfilename )
-        if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
-        shutil.copy( exp.filepath, newfilename )
-        os.chmod( newfilename, PERMISSIONS )
+        if os.path.exists(newfilename) :
+            if verbose : print("Not copying %s. File exists."%(newfilename) )
+        else :
+            if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
+            shutil.copy( exp.filepath, newfilename )
+            os.chmod( newfilename, PERMISSIONS )
 
 
 

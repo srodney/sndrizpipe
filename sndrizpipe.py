@@ -478,22 +478,6 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             print("sndrizpipe : (6) DIFF : subtracting template images.")
         for filter in filterlist :
             if onlyfilters and filter not in onlyfilters : continue
-            if tempepoch == None :
-                # User did not define a template epoch, so we default
-                # to use the first available epoch
-                for epoch in epochlist : 
-                    explistFE = [ exp for exp in explist
-                                  if exp.filter==filter and exp.epoch==epoch ]
-                    if len(explistFE)==0: continue
-                    drzsuffix = explistFE[0].drzsuffix
-                    epochdir = explistFE[0].epochdir
-                    FEgroup = explistFE[0].FEgroup
-                    outrootFE = '%s_%s'%(outroot, FEgroup )
-                    if os.path.isfile( os.path.join( epochdir, outrootFE+"_reg_%s_sci.fits"%drzsuffix )) : 
-                        tempepoch = epoch
-                        break
-
-            # now make templates and do the subtractions
             topdir = os.path.abspath( '.' )
             for epoch in epochlist :
                 if onlyepochs and epoch not in onlyepochs : continue
@@ -591,6 +575,11 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 if len(explistFE)==0 : continue
                 epochdirFE = explistFE[0].epochdir
                 fltlistStack += [ os.path.join(epochdirFE,exp.filename) for exp in explistFE ]
+
+            if len(fltlistStack)==0 :
+                print( "Cannot create a stack for filter %s : no non-template images available."%filter)
+                continue
+
             for flt in fltlistStack :
                 if not os.path.exists( os.path.join(stackdir, os.path.basename(flt))) :
                     shutil.copy( flt, stackdir )
