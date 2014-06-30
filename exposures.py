@@ -52,6 +52,75 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
                                    exp.mjd) )
     return(explist)
 
+def update_epochs( explist, fltlist, epochspan=5, mjdmin=0, mjdmax=0,
+                   targetradec=[None,None] ):
+    """
+    Update an existing epoch-sorted exposure list with new flts from fltlist.
+    The new flts are not allowed to seed new epochs, unless appending to the
+    end of the list. i.e. no epoch renumbering is allowed.
+
+    Anything with MJD < mjdmin or MJD > mjdmax goes into epoch 00 (the
+    template epoch).  All other epochs are made of exposures taken within
+    epochspan days of each other.
+
+    Caution : calling this function actually updates the input explist.
+    """
+    import numpy as np
+    import os
+
+    pidvisitlist = np.array( [ exp.pidvisit for exp in explist ] )
+    outroot = explist[0].outroot
+    fltrootlist = [ exp.rootname for exp in explist ]
+
+    # make a list of new exposures, excluding any that are already sorted
+    newfltlist = []
+    for fltfile in fltlist :
+        fltroot = os.path.basename( fltfile ).split('_')[0]
+        if fltroot in fltrootlist :
+            continue
+        newfltlist.append( fltfile )
+    newexplist = [ Exposure(fltfile,outroot=outroot,targetradec=targetradec)
+                   for fltfile in newfltlist ]
+
+    # Sort the new exposures list by mjd
+    newexplist.sort( key=lambda exp: (exp.mjd, exp.pidvisit, exp.filter ) )
+
+    for newexp in newexplist :
+        if not newexp.ontarget :
+            newexp.epoch = -1
+            explist.append( newexp )
+            continue
+
+        mjdlist = np.array( [ exp.mjd for exp in explist ] )
+        epochlist = np.array( [ exp.epoch for exp in explist ])
+        ivalid = np.where( epochlist >= 0 )
+        maxmjd = np.max( mjdlist[ivalid] )
+        minmjd = np.min( mjdlist[ivalid] )
+        maxepoch = np.max( epochlist )
+
+        pidvisit = newexp.pidvisit
+        if (mjdmin>0) and (newexp.mjd < mjdmin) :
+            newexp.epoch=0
+        elif (mjdmax>0) and (newexp.mjd > mjdmax) :
+            newexp.epoch=0
+        elif pidvisit in pidvisitlist :
+            ipidvis = [ tmpexp.pidvisit for tmpexp in explist ].index( pidvisit )
+            newexp.epoch = explist[ ipidvis ].epoch
+        elif newexp.mjd > maxmjd + epochspan :
+            newexp.epoch = maxepoch + 1
+        elif newexp.mjd < minmjd - epochspan :
+            newexp.epoch = 0
+        else :
+            dmjd = np.abs( newexp.mjd - np.array(mjdlist) )
+            newexp.epoch = explist[ np.argmin( dmjd ) ].epoch
+        explist.append( newexp )
+        continue
+
+    # Sort the exposure list by epoch, then filter, then visit
+    explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit, exp.mjd) )
+    return(explist)
+
+
 def read_explist( epochlistfile, outroot=None ):
     """Read the exposure list and epoch sorting scheme from epochlistfile,
     generating a new list of Exposures and return that explist.

@@ -142,7 +142,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     if not epochlistfile :
         epochlistfile =  "%s_epochs.txt"%outroot
     fltlist = glob.glob( "%s/*fl?.fits"%fltdir )
-    if not len( fltlist ) : 
+    if not len( fltlist ) :
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
 
     if os.path.exists( epochlistfile ) :
@@ -159,6 +159,17 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         exposures.print_epochs( explist_all, outfile=epochlistfile,
                                 verbose=verbose, clobber=False,
                                 onlyfilters=None, onlyepochs=None )
+    if len(explist_all) < len(fltlist) :
+        print("New flt files detected in %s."%fltdir )
+        if not clobber :
+            print( "Turn on --clobber to rewrite the epochs list %s"%(epochlistfile))
+        else :
+            print("Updating %s with new flt files detected in %s"%(epochlistfile,fltdir))
+            explist_all = exposures.update_epochs( explist_all, fltlist, epochspan=epochspan,
+                                                   mjdmin=mjdmin, mjdmax=mjdmax )
+            exposures.print_epochs( explist_all, outfile=epochlistfile,
+                                    verbose=verbose, clobber=clobber,
+                                    onlyfilters=None, onlyepochs=None )
 
     if refim and not os.path.exists( refim ) :
         raise exceptions.RuntimeError( 'Ref image %s does not exist.'%refim )

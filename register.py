@@ -575,7 +575,7 @@ def getfwhmpix( imfile ):
     hdr = pyfits.getheader( imfile )
     instrument, detector = '',''
     if 'CAMERA' in hdr :
-        instrumet = hdr['CAMERA']
+        instrument = hdr['CAMERA']
         detector = ''
     elif 'INSTRUME' in hdr :
         instrument = hdr['INSTRUME']
