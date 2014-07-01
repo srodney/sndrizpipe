@@ -160,8 +160,8 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
                                    exp.mjd) )
 
-    header = '#%9s %5s %3s %3s %6s %5s %7s '%(
-            'rootname','pid','vis','exp','filter','epoch','mjd' )
+    header = '#%9s %5s %3s %3s %6s %5s %7s %8s %8s'%(
+            'rootname','pid','vis','exp','filter','epoch','mjd','exptime','darcsec' )
 
     if outfile:
         print >> fout, header
@@ -238,6 +238,7 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     """
     import pyfits
     import pywcs
+    import numpy as np
     if debug : import pdb; pdb.set_trace()
     ra,dec = checkradec
     onimage = False
@@ -245,6 +246,10 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
         hdulist = pyfits.open( exp.filepath )
     else : 
         hdulist = None
+    if exp.ratarg is None or exp.dectarg is None :
+        darcsec = -1
+    else :
+        darcsec = np.sqrt( ((ra-exp.ratarg)*np.cos(pywcs.DEGTORAD(dec)))**2 + (dec-exp.dectarg)**2 ) * 3600
     for hdr in exp.headerlist :
         expwcs = pywcs.WCS( hdr, hdulist )
         ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
@@ -254,8 +259,9 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
         break
 
     if verbose and not onimage :
-        print("Target RA,Dec is off image %s"%(exp.filename))
-    return( onimage )
+        print("Source RA,Dec is off image %s."%(exp.filename))
+        if darcsec>=0 : print("Distance from source to image target = %.3f arcsec"%darcsec)
+    return( onimage, darcsec )
 
 
 class Exposure( object ): 
@@ -275,7 +281,7 @@ class Exposure( object ):
     def initFromStr(self, fltstr, outroot ):
         """ Initialize an Exposure object from a string. Specifically,
         a single row from the _epochs.txt file. e.g. :
-             ich319ngq  13575  19  ng  f110w    01 56686.1
+             ich319ngq  13575  19  ng  f110w    01 56686.1  [exptime]
         """
         import os
 
@@ -289,7 +295,16 @@ class Exposure( object ):
         self.epoch = int(strlist[5])
         self.mjd = float(strlist[6])
 
-        fltfile =  self.rootname + '_flt.fits'
+        if len(strlist) > 7 :
+            self.exptime = float(strlist[7])
+        else :
+            self.exptime = -1
+
+        if len(strlist) > 8 :
+            self.darcsec = float(strlist[8])
+        else :
+            self.darcsec = -1
+
         fltdir = outroot + '.flt'
         assert( os.path.isdir( fltdir ) )
 
@@ -337,9 +352,14 @@ class Exposure( object ):
         self.header = pyfits.getheader( self.filepath )
         hdulist = pyfits.open(self.filepath)
         self.headerlist = []
+        self.ratarg = None
+        self.dectarg = None
         for hdu in hdulist :
-            if hdu.name!='SCI':continue
-            self.headerlist.append( hdu.header )
+            if 'RA_TARG' in hdu.header :
+                self.ratarg = hdu.header['RA_TARG']
+                self.dectarg = hdu.header['DEC_TARG']
+            if hdu.name=='SCI':
+                self.headerlist.append( hdu.header )
 
         if outroot=='TARGNAME' : outroot = self.header['TARGNAME']
         self.outroot = outroot
@@ -387,7 +407,7 @@ class Exposure( object ):
                     self.crsplit = 2
 
         self.rootname = self.header['ROOTNAME']
-        self.exposure_time = self.header['EXPTIME']
+        self.exptime = self.header['EXPTIME']
 
 
         # 2-digits uniquely identifying this visit and this exposure
@@ -400,13 +420,15 @@ class Exposure( object ):
 
         # if target ra,dec provided, check that the source is on the image
         self.ontarget=True
+        self.darcsec = -1
         if targetradec[0] is not None and targetradec[1] is not None:
             if self.camera=='ACS-WFC': buffer=50
             else : buffer=20
-            if not checkonimage(self,targetradec,buffer=buffer):
+            onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
+            if not onimage :
                 self.epoch=-1
                 self.ontarget = False
-
+            self.darcsec = darcsec
 
     @property
     def epochdir( self ):
@@ -441,6 +463,6 @@ class Exposure( object ):
 
     @property
     def summaryline_short( self ) :
-        return('%9s  %5i %3s %3s %6s    %02i %7.1f '%(
+        return('%9s  %5i %3s %3s %6s    %02i %7.1f %8.2f %8.2f'%(
                 self.rootname, self.pid, self.visit, self.expid, self.filter,
-                self.epoch, self.mjd ) )
+                self.epoch, self.mjd, self.exptime, self.darcsec ) )
