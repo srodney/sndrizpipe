@@ -205,6 +205,89 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
     return( outfile, outwht, outbpx)
 
 
+def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
+                    tempfilter2=None, tempepoch2=None, filtdir='HSTFILTERS',
+                    clean=True, verbose=True, clobber=False ):
+    """ Primary function for making pseudo-filter diff images :
+    * make a scaled template image, scaling the template filter to match the target filter
+    * subtract scaled template from target filter+epoch
+    * make a union badpix mask
+    * apply the union badpix mask
+    * make a composite weight mask
+    """
+    import os
+    import imarith
+    import badpix
+    import pyfits
+
+    targdir = '%s.e%02i'%(targname, targepoch)
+    targsci = '%s_%s_e%02i_reg_drc_sci.fits'%(targname, targfilter, targepoch)
+    targsci = os.path.join( targdir, targsci )
+    if not os.path.isfile( targsci ) :
+        targsci = targsci.replace('_drc','_drz')
+    targwht = targsci.replace( '_sci.fits','_wht.fits')
+    targbpx = targsci.replace( '_sci.fits','_bpx.fits')
+    assert os.path.isfile( targsci )
+    assert os.path.isfile( targwht )
+    assert os.path.isfile( targbpx )
+
+    hdr = pyfits.getheader( targsci )
+    if 'CAMERA' in hdr :
+        instrument = hdr['CAMERA']
+        detector = ''
+    elif 'INSTRUME' in hdr :
+        instrument = hdr['INSTRUME']
+    if 'DETECTOR' in hdr :
+        detector = hdr['DETECTOR']
+    targetcamfilter = '-'.join([instrument,detector,targfilter.upper()]).rstrip('-')
+    if targetcamfilter.endswith('L') :
+        targetcamfilter += 'P'
+
+    tempdir = '%s.e%02i'%(targname, tempepoch)
+    tempfile = '%s_%s_e%02i_reg_drc_sci.fits'%(targname, tempfilter, tempepoch)
+    tempfile = os.path.join( tempdir, tempfile )
+    if not os.path.isfile( tempfile ) :
+        tempfile = tempfile.replace('_drc','_drz')
+    assert os.path.isfile( tempfile )
+
+    if tempfilter2 is None :
+        tempfile2 = None
+    else :
+        if tempepoch2 is None :
+            tempepoch2 = tempepoch
+        tempdir2 = '%s.e%02i'%(targname, tempepoch2)
+        tempfile2 = '%s_%s_e%02i_reg_drc_sci.fits'%(targname, tempfilter2, tempepoch2)
+        tempfile2 = os.path.join( tempdir2, tempfile2 )
+        if not os.path.isfile( tempfile2 ) :
+            tempfile2 = tempfile2.replace('_drc','_drz')
+        assert os.path.isfile( tempfile2 )
+
+    outfile = os.path.join( tempdir, '%s_~%s_e%02i_reg_drc_sci.fits'%(targname, targfilter, tempepoch) )
+    tempsci, tempwht, tempbpx = mkscaledtemplate(
+        targetcamfilter, tempfile, imfile2=tempfile2, outfile=outfile,
+        filtdir=filtdir, verbose=verbose, clobber=clobber )
+
+    subsci = '%s_%s_e%02i-e%02i_sub_sci.fits'%(targname, targfilter, targepoch, tempepoch)
+    subsci = os.path.join( targdir, subsci )
+
+    if verbose :  print( "Making pseudo diff image %s"%subsci )
+    diffim = imarith.imsubtract( tempsci, targsci, outfile=subsci,
+                                 clobber=clobber, verbose=verbose )
+    diffwht = imarith.combine_ivm_maps( targwht, tempwht,
+                                       diffim.replace('sci.fits','wht.fits'),
+                                       clobber=clobber, verbose=verbose )
+    diffbpx = badpix.unionmask( tempbpx, targbpx,
+                         diffim.replace('sci.fits','bpx.fits'),
+                         clobber=clobber, verbose=verbose)
+    diffim_masked = badpix.applymask( diffim, diffbpx,
+                                     clobber=clobber, verbose=verbose)
+    if clean :
+        # delete the sub_sci.fits, b/c it is superseded
+        os.remove( diffim )
+    if verbose :
+        print("Created diff image %s, wht map %s, and bpx mask %s"%(
+            diffim_masked, diffwht, diffbpx ) )
+    return( diffim_masked, diffwht, diffbpx )
 
 def main():
     import argparse
@@ -220,22 +303,31 @@ def main():
     )
 
     # Required positional argument
-    parser.add_argument('targetfilter', type=str, help="Filter to be matched: INST-DET-FILT" )
-    parser.add_argument('image1', type=str, help='(First) Source image file.', default=None)
-    parser.add_argument('image2', nargs='?',type=str, help='Second source image file (optional)')
-    parser.add_argument('outfile', type=str, help='Filename for output scaled image.')
+    parser.add_argument('name', type=str, help="Name of the target (the prefix for drz image products)" )
+    parser.add_argument('targetfilter', type=str, help="Filter of the target image, to be matched" )
+    parser.add_argument('targetepoch', type=int, help="Epoch of the target image" )
+    parser.add_argument('tempfilter', type=str, help="Filter of the template image, to be scaled." )
+    parser.add_argument('tempfilter2', nargs='?', type=str, help="Optional second template filter, to be combined with the first and scaled." )
+    parser.add_argument('--tempepoch', metavar=0, type=int, default=0, help="Epoch of the template image" )
+    parser.add_argument('--tempepoch2', metavar=0, type=int, default=None, help="Epoch of the 2nd template image. If not provided, we assume it is the same as the first." )
     parser.add_argument('--filtdir', metavar='HSTFILTERS', type=str,
-                        help='Directory containing the filter transmission curves.',
+                        help='Directory containing the filter transmission curves. Default is HSTFILTERS in the sndrizpipe installation dir.',
                         default='HSTFILTERS')
-
     parser.add_argument('--clobber', default=False, action='store_true',
                         help='Clobber existing reference catalog if it exists. [False]')
     parser.add_argument('--verbose', default=False, action='store_true',
                         help='Turn on verbose output. [False]')
-
     argv = parser.parse_args()
-    mkscaledtemplate( argv.targetfilter, argv.image1, imfile2=argv.image2,
-                      outfile=argv.outfile, verbose=argv.verbose, clobber=argv.clobber )
+
+    if argv.tempfilter2 is None :
+        tempfilter2 = None
+    else :
+        tempfilter2 = argv.tempfilter2.lower()[:5]
+    doScaleSubMask( argv.name, argv.targetfilter.lower()[:5], argv.targetepoch,
+                    argv.tempfilter.lower()[:5], argv.tempepoch,
+                    tempfilter2=tempfilter2, tempepoch2=argv.tempepoch2,
+                    filtdir=argv.filtdir, clean=True, verbose=argv.verbose, clobber=argv.clobber)
+
 
 
 if __name__=='__main__' :

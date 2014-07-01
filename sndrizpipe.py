@@ -78,7 +78,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     import shutil
     if debug : import pdb; pdb.set_trace()
     from drizzlepac.tweakback import tweakback
-    from mkscaledtemplate import mkscaledtemplate, camfiltername
+    from pseudodiff import mkscaledtemplate, camfiltername
 
     # Check for logically incompatible parameters
     if nbright and minobj and (nbright < minobj-1) :
