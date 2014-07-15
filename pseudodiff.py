@@ -293,13 +293,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description='Combine and/or scale an image or pair of images to match '
-                    'the transmission function of a different filter.'
-
-                    'The first input value, targetfilter, must be of the form '
-                    "'INSTRUMENT-DETECTOR-FILTER'.  For instruments with "
-                    "only 1 filter set, the detector name may be omitted. "
-                    " \n For example: \n "
-                    " 'ACS-WFC-F606W', 'WFC3-IR-F105W', 'WFPC2-F850LP' "
+                    'the transmission function of a different filter, and then '
+                    'subtract that pseudo-template to make a diff image. '
+                    " \n EXAMPLE: making a pseudo-F845M template from epoch 00 "
+                    " F814W images, and subtracting it from epoch 06 F845M images.\n "
+                    'sndrizpipe/pseudodiff.py --clobber --verbose camille f845m 06 f814w\n\n'
     )
 
     # Required positional argument

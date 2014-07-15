@@ -45,6 +45,7 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
     """
     import os
     from astropy.io import ascii
+    from astropy import table
     import exceptions
     import numpy as np
     incat = ascii.read( incatfile )
@@ -89,20 +90,16 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
         savecolnames = [racol,deccol]
         outcolnames = ['RA','DEC']
 
-    removelist = [ colname for colname in incat.colnames
-                   if colname not in savecolnames ]
-    incat.remove_columns( removelist )
-    for incol,outcol in zip( savecolnames, outcolnames):
-        if outcol not in incat.colnames :
-            incat.rename_column( incol, outcol )
+    outcoldat = [ incat[colname] for colname in savecolnames ]
+    outcat = table.Table( data= outcoldat, names=outcolnames )
 
     if trimctr and trimrad :
         if verbose : print('Trimming to %.1f arcsec around %s'%(trimrad,trimctr))
         trimra,trimdec = trimctr.split(',')
-        incat = trimcat( incat, float(trimra), float(trimdec), trimrad )
-    incat.write( refcatfile, format='ascii.commented_header' )
+        outcat = trimcat( outcat, float(trimra), float(trimdec), trimrad )
+    outcat.write( refcatfile, format='ascii.commented_header' )
     if ds9regfile :
-        writeDS9reg( incat, ds9regfile )
+        writeDS9reg( outcat, ds9regfile )
 
 def trimcat( incat, ra, dec, radius, outcatfile=None):
     """Trim the input catalog incat, excluding any sources more than
