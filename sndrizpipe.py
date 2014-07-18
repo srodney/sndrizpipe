@@ -471,11 +471,19 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 os.chdir( topdir )
                 continue
 
+            # use imedian combination for bright stars (where high poisson noise
+            # leads to flux suppression for iminmed) and for cases where we
+            # have a large number of input flts.  Otherwise, iminmed is safer
+            # and does not introduce a bias.
+            combine_type='iminmed'
+            if singlestar or len(fltlistFE)>7:
+                combine_type='imedian'
+
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac,
-                combine_type='iminmed', driz_cr=(drizcr>1),
+                combine_type=combine_type, driz_cr=(drizcr>1),
                 singlesci=(singlesubs or singlesci), clean=clean,
                 clobber=clobber, verbose=verbose, debug=debug )
 
@@ -607,13 +615,19 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 else : epochstr = 'ALL'
                 print(" Constructing stacked image %s_drz_sci.fits from epochs %s"%(
                     outrootStack,epochstr) )
+
+            # set the combine type carefully, as above for the driz2 stage.
+            combine_type='iminmed'
+            if singlestar or len(fltlistStack)>7:
+                combine_type='imedian'
+
             os.chdir( stackdir )
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistStack, outrootStack,
                 refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
                 pixscale=pixscale, pixfrac=pixfrac, driz_cr=drizcr,
-                singlesci=False, clean=clean, combine_type='imedian',
+                singlesci=False, clean=clean, combine_type=combine_type,
                 clobber=clobber, verbose=verbose, debug=debug )
             os.chdir( topdir )
             pass # end for filter in filterlist

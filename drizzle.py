@@ -117,6 +117,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     # over-ridden by the user specifying pixscale and pixfrac.
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
+    camera = instrument + '-' + detector
     drizpar = getdrizpar( instrument, detector, nexposures=2 )
 
     if not pixscale : pixscale = drizpar['pixscale']
@@ -135,10 +136,17 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         docombine=False
     combine_nhigh = 0
     if combine_type in ['median', 'imedian'] :
-        if len(fltlist)>3 : combine_nhigh=1
-        elif len(fltlist)>5 : combine_nhigh=2
-        elif len(fltlist)>9 : combine_nhigh=3
-        elif len(fltlist)>13 : combine_nhigh=4
+        nflt = len(fltlist)
+        if nflt <= 3 :
+            combine_nhigh=0
+        elif camera=='WFC3-IR' :
+            # For WFC3-IR set combine_nhigh to 1 or 2 for CRs that slip through
+            # the up-the-ramp sampling
+            combine_nhigh= (nflt>5) + (nflt>9)
+        else :
+            # For ACS and UVIS set combine_nhigh to 1, 2, 3, or 4, keeping
+            # an odd number of pixels for the median each time
+            combine_nhigh =  (1 + nflt%2)*( 1 + 2*(nflt>7)*(1-nflt%2) + (nflt>11)*(nflt%2))
 
     imsize_pix = imsize_arcsec/pixscale                     
     astrodrizzle.AstroDrizzle(
