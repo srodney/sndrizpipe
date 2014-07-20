@@ -253,8 +253,8 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     for hdr in exp.headerlist :
         expwcs = pywcs.WCS( hdr, hdulist )
         ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
-        if ix<-buffer or ix>expwcs.naxis1+buffer : continue
-        if iy<-buffer or iy>expwcs.naxis2+buffer : continue
+        if ix<-buffer or ix>hdr['NAXIS1']+buffer : continue
+        if iy<-buffer or iy>hdr['NAXIS2']+buffer : continue
         onimage=True
         break
 
