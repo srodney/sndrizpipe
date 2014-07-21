@@ -242,7 +242,7 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     if debug : import pdb; pdb.set_trace()
     ra,dec = checkradec
     onimage = False
-    if exp.header['detector'] in ['WFC','UVIS'] :
+    if exp.header['detector'] in ['WFC'] :
         hdulist = pyfits.open( exp.filepath )
     else : 
         hdulist = None
@@ -424,7 +424,12 @@ class Exposure( object ):
         if targetradec[0] is not None and targetradec[1] is not None:
             if self.camera=='ACS-WFC': buffer=50
             else : buffer=20
-            onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
+            try :
+                onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
+            except :
+                print("Problem determining position relative to image %s "%self.rootname)
+                import pdb; pdb.set_trace()
+                onimage, darcsec = False, -99
             if not onimage :
                 self.epoch=-1
                 self.ontarget = False
