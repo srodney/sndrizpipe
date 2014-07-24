@@ -69,6 +69,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               nclip=3, sigmaclip=3.0,
               shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
               pixscale=None, pixfrac=None, wht_type='IVM',
+              stackepochs=None, stacktemplate=False,
+              stackpixscale=None, stackpixfrac=None,
               clean=False, clobber=False, verbose=True, debug=False ):
     """ 
     Primary pipeline function.  Executes all the intermediate steps: 
@@ -582,14 +584,20 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             print("sndrizpipe : (7) STACK : stack together source images.")
         topdir = os.path.abspath( '.' )
         stackdir = '%s.stack'%outroot
+        if stackepochs is not None :
+            if type(stackepochs) in [str,int,float] :
+                stackepochs = [int(ep) for ep in str(stackepochs).split(',')]
+            if tempepoch in stackepochs : stacktemplate=True
+        else :
+            stackepochs = onlyepochs
         if not os.path.isdir( stackdir ):
             os.mkdir( stackdir )
         for filter in filterlist :
             if onlyfilters and filter not in onlyfilters : continue
             fltlistStack = []
             for epoch in epochlist :
-                if onlyepochs and epoch not in onlyepochs : continue
-                if epoch == tempepoch : continue
+                if stackepochs and epoch not in stackepochs : continue
+                if epoch == tempepoch and not stacktemplate : continue
                 explistFE = [ exp for exp in explist if exp.filter==filter and exp.epoch==epoch ]
                 if len(explistFE)==0 : continue
                 epochdirFE = explistFE[0].epochdir
@@ -597,6 +605,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
             if len(fltlistStack)==0 :
                 print( "Cannot create a stack for filter %s : no non-template images available."%filter)
+                if verbose :
+                    print( "Use --stacktemplate to allow template images to be included, or specify")
+                    print( "particular epochs with --stackepochs X,Y,Z" )
                 continue
 
             for flt in fltlistStack :
@@ -611,7 +622,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     print(" Not clobbering. ")
                     continue
             if verbose :
-                if onlyepochs : epochstr = ','.join( [ str(ep) for ep in onlyepochs ] ).rstrip(',')
+                if stackepochs : epochstr = ','.join( [ str(ep) for ep in stackepochs ] ).rstrip(',')
                 else : epochstr = 'ALL'
                 print(" Constructing stacked image %s_drz_sci.fits from epochs %s"%(
                     outrootStack,epochstr) )
@@ -621,12 +632,14 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             if singlestar or len(fltlistStack)>7:
                 combine_type='imedian'
 
+            if stackpixscale is None : stackpixscale = pixscale
+            if stackpixfrac is None : stackpixfrac = pixfrac
             os.chdir( stackdir )
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistStack, outrootStack,
                 refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac, driz_cr=drizcr,
+                pixscale=stackpixscale, pixfrac=stackpixfrac, driz_cr=drizcr,
                 singlesci=False, clean=clean, combine_type=combine_type,
                 clobber=clobber, verbose=verbose, debug=debug )
             os.chdir( topdir )
@@ -798,6 +811,12 @@ def mkparser():
     diffpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
     diffpar.add_argument('--tempfilters', metavar='X,Y', type=str, help='Make a composite template by combining images in these filters.', default=None )
 
+    stackpar = parser.add_argument_group( "(5) Settings for multi-epoch stack stage")
+    stackpar.add_argument('--stacktemplate', action='store_true', help='Include the template epoch in the multi-epoch stack.')
+    stackpar.add_argument('--stackpixscale', metavar='X', type=float, default=None, help='Set the pixel scale for the multi-epoch stack.', )
+    stackpar.add_argument('--stackpixfrac', metavar='X', type=float, default=None, help='Set the pixfrac for the multi-epoch stack.')
+    stackpar.add_argument('--stackepochs', metavar='X,Y,Z', type=str, default=None, help='Specify the epochs to combine for the multi-epoch stack.')
+
     return parser
 
 
@@ -838,6 +857,8 @@ def main() :
              wht_type=argv.wht_type, clean=argv.clean,
              singlesubs=argv.singlesubs,
              singlesci=(argv.singlesci or argv.singlesubs),
+             stackepochs=argv.stackepochs, # stacktemplate=argv.stacktemplate,
+             stackpixscale=argv.stackpixscale, stackpixfrac=argv.stackpixfrac,
              clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
     return 0
 
