@@ -66,8 +66,9 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
               peakmin=None, peakmax=None, # fluxmin=None, fluxmax=None,
               searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
               refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
-              nclip=3, sigmaclip=3.0,
-              shiftonly=False, ra=None, dec=None, rot=0, imsize_arcsec=None,
+              nclip=3, sigmaclip=3.0, drizcrsnr='5,4.5',
+              shiftonly=False, ra=None, dec=None, rot=0,
+              imsize_arcsec=None, naxis12=None,
               pixscale=None, pixfrac=None, wht_type='IVM',
               stackepochs=None, stacktemplate=False,
               stackpixscale=None, stackpixfrac=None,
@@ -113,6 +114,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             'If you set the --singlestar flag for processing a single '
             '(standard) star then you MUST also provide a target RA and '
             'DEC with the --ra and --dec options.' )
+    drizcrsnr = drizcrsnr.replace(',',' ')
 
     topdir = os.path.abspath( '.' )
     fltdir = outroot + '.flt' 
@@ -287,7 +289,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             # (full frame, native rotation, auto-selecting the optimal
             # pixscale and pixfrac based on number of flts)
             refdrzsci, refimwht = drizzle.firstDrizzle(
-                fltlistRI, refimroot, driz_cr=drizcr, clean=clean )
+                fltlistRI, refimroot, driz_cr=drizcr, driz_cr_snr=drizcrsnr, clean=clean )
             refim = os.path.join( os.path.abspath(refdrzdir),os.path.basename(refdrzsci) )
 
             if refcat :
@@ -376,9 +378,24 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     rfluxmin=rfluxmin, rfluxmax=rfluxmax,
                     verbose=verbose, interactive=interactive, clobber=clobber, debug=debug )
             drizzle.firstDrizzle(
-                fltlistFEV, outrootFEV, driz_cr=drizcr,
+                fltlistFEV, outrootFEV, driz_cr=drizcr, driz_cr_snr=drizcrsnr,
                 wcskey=((intravisitreg and 'INTRAVIS') or ''),
                 clobber=clobber, verbose=verbose, clean=clean )
+            # Be extra careful with CR flagging when we only have 2 IR exposures
+            # the hotpix function below will remove any CR flags that don't appear
+            # in both exposures, leaving only those that are very likely hot pixels,
+            # b/c the same pixel is flagged in both exposures.
+            if 'camera' in explistFEV[0].__dict__.keys() :
+                camera = explistFEV[0].camera
+            elif explistFEV[0].rootname.startswith('i') :
+                if explistFEV[0].filename.endswith('flc.fits') : camera='WFC3-UVIS'
+                elif explistFEV[0].filter.lower().startswith('f1') : camera='WFC3-IR'
+                else : camera='WFC3-UVIS'
+            elif explistFEV[0].rootname.startswith('j') :
+                camera = 'ACS-WFC'
+            if drizcr and len(fltlistFEV)==2 and camera=='WFC3-IR' :
+                drizzle.hotpixPostargClean( fltlistFEV[0], fltlistFEV[1], verbose=verbose )
+
             os.chdir( topdir )
             continue
 
@@ -483,11 +500,22 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
 
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
-                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac,
-                combine_type=combine_type, driz_cr=(drizcr>1),
+                imsize_arcsec=imsize_arcsec, naxis12=naxis12, wht_type=wht_type,
+                pixscale=pixscale, pixfrac=pixfrac, combine_type=combine_type,
+                driz_cr=(drizcr>1), driz_cr_snr=drizcrsnr,
                 singlesci=(singlesubs or singlesci), clean=clean,
                 clobber=clobber, verbose=verbose, debug=debug )
+
+            # As above, be extra careful with CR flagging when we only have 2 IR exposures
+            if drizcr>1 and len(fltlistFE)==2 and explistFE[0].camera=='WFC3-IR' :
+                drizzle.hotpixPostargClean( fltlistFE[0], fltlistFE[1], verbose=verbose )
+                outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
+                    fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
+                    imsize_arcsec=imsize_arcsec, naxis12=naxis12, wht_type=wht_type,
+                    pixscale=pixscale, pixfrac=pixfrac, combine_type=combine_type,
+                    driz_cr=False, driz_cr_snr=drizcrsnr,
+                    singlesci=(singlesubs or singlesci), clean=clean,
+                    clobber=True, verbose=verbose, debug=debug )
 
             os.chdir( topdir )
 
@@ -639,7 +667,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 fltlistStack, outrootStack,
                 refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=stackpixscale, pixfrac=stackpixfrac, driz_cr=drizcr,
+                pixscale=stackpixscale, pixfrac=stackpixfrac,
+                driz_cr=drizcr, driz_cr_snr=drizcrsnr,
                 singlesci=False, clean=clean, combine_type=combine_type,
                 clobber=clobber, verbose=verbose, debug=debug )
             os.chdir( topdir )
@@ -718,11 +747,22 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
     return 0
 
 def mkparser():
+    from argparse import ArgumentParser
+    from textwrap import dedent
     import argparse
+
+    class SmartFormatter(argparse.HelpFormatter):
+        def _split_lines(self, text, width):
+            # this is the RawTextHelpFormatter._split_lines
+            if text.startswith('R|'):
+                return text[2:].splitlines()
+            return argparse.HelpFormatter._split_lines(self, text, width)
+
 
     parser = argparse.ArgumentParser(
         description='Run astrodrizzle and tweakreg on a set of flt or flc' +
-        'images, building single-epoch drizzled images and diff images.' )
+        'images, building single-epoch drizzled images and diff images.',
+        formatter_class=SmartFormatter )
 
     # Required positional argument
     parser.add_argument('rootname', help='Root name for the input flt dir (<rootname>.flt), also used for the output _drz products. ')
@@ -735,13 +775,14 @@ def mkparser():
     parser.add_argument('--verboselevel', type=int, dest='verbose', help='Turn up the verbosity (0-10).', default=1 )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
     parser.add_argument('--clean', type=int, choices=[0,1,2,3,4,5], default=1,
-                        help='Clean up cruft: '
-                         " [0] Keep all intermediate files. "
-                         " [1] Remove intermediate drizzle and diff files, including ctx.fits and sub_sci.fits (the default); "
-                         " [2] and clear out OrIg_files/*fl?.fits; "
-                         " [3] and remove last-drizzle flts in epoch sub-dirs; "
-                         " [4] and delete nat_drz products and tweakreg catalogs; "
-                         " [5] and remove any tmp*staticMask.fits files (Warning: race conditions possible).")
+                        help=dedent("""\
+                        R|Clean up cruft:
+                        [0] Keep all intermediate files.
+                        [1] Remove intermediate drizzle and diff files, including ctx.fits and sub_sci.fits (the default);
+                        [2] and clear out OrIg_files/*fl?.fits;
+                        [3] and remove last-drizzle flts in epoch sub-dirs;
+                        [4] and delete nat_drz products and tweakreg catalogs;
+                        [5] and remove any tmp*staticMask.fits files (Warning: race conditions possible)."""))
     parser.add_argument('--debug', action='store_true', help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true', help='Process the SN Colfax test data (all other options ignored)', default=False)
 
@@ -768,15 +809,23 @@ def mkparser():
     refpar.add_argument('--reffilter', metavar='X', help='Use this filter to define the tweakreg refimage.',default='')
     refpar.add_argument('--refvisit', metavar='PID.vis', help='Use this PID.visit to define the tweakreg refimage [e.g. 12099.A1]',default='')
 
-    imfindpar = parser.add_argument_group( "(4a) Settings for tweakreg.imagefind source detection")
-    imfindpar.add_argument('--threshold', metavar='5', type=float, help='Detection threshold in sigmas for tweakreg object detection.',default=5)
-    imfindpar.add_argument('--peakmin', metavar='X', type=float, help='Require peak flux above this value for tweakreg object detection.',default=None)
-    imfindpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=None)
+    driz1par = parser.add_argument_group( "(3) Settings for astrodrizzle stage(s)" )
+    driz1par.add_argument('--drizcr', type=int, default=1, choices=[-1,0,1,2],
+                         help=dedent("""\
+                         R|Astrodrizzle cosmic ray rejection stage:
+                         [-1] remove CR flags and don't add any more;
+                         [0] Keep existing CR flags and don't do any new CR rejection;
+                         [1] Remove CR flags and run CR rejection only within the visit (the default);
+                         [2] Re-run CR flagging at the multi-visit drizzle and stack stages."""))
+    driz1par.add_argument('--drizcrsnr', metavar='5,4.5', type=str, help='Sigma values for CR rejection thresholds.', default='5,4.5')
+
+
+    regpar = parser.add_argument_group( "(4) Settings for tweakreg source detection and WCS registration stage")
+    regpar.add_argument('--threshold', metavar='5', type=float, help='Detection threshold in sigmas for tweakreg object detection.',default=5)
+    regpar.add_argument('--peakmin', metavar='X', type=float, help='Require peak flux above this value for tweakreg object detection.',default=None)
+    regpar.add_argument('--peakmax', metavar='X', type=float, help='Require peak flux below this value for tweakreg object detection.',default=None)
     # imfindpar.add_argument('--fluxmin', metavar='X', type=float, help='Require total flux above this value for tweakreg object detection.',default=0)
     # imfindpar.add_argument('--fluxmax', metavar='X', type=float, help='Require total flux below this value for tweakreg object detection.',default=0)
-
-
-    regpar = parser.add_argument_group( "(4b) Settings for tweakreg WCS registration stage")
     regpar.add_argument('--interactive', action='store_true', help='Run tweakreg interactively (showing plots)',default=False)
     regpar.add_argument('--intravisitreg', action='store_true', help='Run tweakreg before first drizzle stage to do intra-visit registration.',default=False)
     regpar.add_argument('--searchrad', metavar='X', type=float, help='Search radius in arcsec for tweakreg catalog matching.',default=1.5)
@@ -790,28 +839,23 @@ def mkparser():
     regpar.add_argument('--nclip', metavar='3', type=int, help='Number of sigma-clipping iterations for catalog matching.',default=3)
     regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
-    drizpar = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
-    drizpar.add_argument('--drizcr', type=int, default=1, choices=[-1,0,1,2],
-                         help='Astrodrizzle cosmic ray rejection stage: '
-                         "[-1] remove CR flags and don't add any more; "
-                         "[0] Keep existing CR flags and don't do any new CR rejection; "
-                         '[1] Remove CR flags and run CR rejection only within the visit (the default); '
-                         '[2] Re-run CR flagging at the multi-visit drizzle and stack stages.')
-    drizpar.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
-    drizpar.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
-    drizpar.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
-    drizpar.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
-    drizpar.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
-    drizpar.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
-    drizpar.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP'], default='IVM')
-    drizpar.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
+    driz2par = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
+    driz2par.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
+    driz2par.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
+    driz2par.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
+    driz2par.add_argument('--imsize', metavar='X', type=float, help='Size of output image [arcsec]', default=None)
+    driz2par.add_argument('--naxis12', metavar='X,Y', type=str, help='Size of output image [X,Y pixels]', default=None)
+    driz2par.add_argument('--pixscale', metavar='X', type=float, help='Pixel scale to use for astrodrizzle.', default=None)
+    driz2par.add_argument('--pixfrac', metavar='X', type=float, help='Pixfrac to use for astrodrizzle.', default=None)
+    driz2par.add_argument('--wht_type', type=str, help='Type of the weight image.', choices=['IVM','EXP'], default='IVM')
+    driz2par.add_argument('--singlesci', action='store_true', help='Make individual-exposure _single_sci.fits images. (also set by --singlesubs)', default=False )
 
-    diffpar = parser.add_argument_group( "(5) Settings for subtraction stage")
+    diffpar = parser.add_argument_group( "(6) Settings for subtraction stage")
     diffpar.add_argument('--singlesubs', action='store_true', help='Make diff images from the individual-exposure _single_sci.fits images. Also sets --singlesci.', default=False )
     diffpar.add_argument('--tempepoch', metavar='0', type=int, help='Template epoch.', default=0 )
     diffpar.add_argument('--tempfilters', metavar='X,Y', type=str, help='Make a composite template by combining images in these filters.', default=None )
 
-    stackpar = parser.add_argument_group( "(5) Settings for multi-epoch stack stage")
+    stackpar = parser.add_argument_group( "(7) Settings for multi-epoch stack stage")
     stackpar.add_argument('--stacktemplate', action='store_true', help='Include the template epoch in the multi-epoch stack.')
     stackpar.add_argument('--stackpixscale', metavar='X', type=float, default=None, help='Set the pixel scale for the multi-epoch stack.', )
     stackpar.add_argument('--stackpixfrac', metavar='X', type=float, default=None, help='Set the pixfrac for the multi-epoch stack.')
@@ -836,7 +880,8 @@ def main() :
              dosetup=argv.dosetup, dorefim=argv.dorefim,
              dodriz1=argv.dodriz1, doreg=argv.doreg,
              dodriz2=argv.dodriz2, dodiff=argv.dodiff, dostack=argv.dostack,
-             drizcr=argv.drizcr, intravisitreg=argv.intravisitreg,
+             drizcr=argv.drizcr, drizcrsnr=argv.drizcrsnr,
+             intravisitreg=argv.intravisitreg,
              refim=argv.refimage, refepoch=argv.refepoch,
              refvisit=argv.refvisit, reffilter=argv.reffilter,
              tempepoch=argv.tempepoch, tempfilters=argv.tempfilters,
@@ -852,7 +897,7 @@ def main() :
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
              ra=argv.ra, dec=argv.dec, rot=argv.rot,
-             imsize_arcsec=argv.imsize,
+             imsize_arcsec=argv.imsize, naxis12=argv.naxis12,
              pixscale=argv.pixscale, pixfrac=argv.pixfrac,
              wht_type=argv.wht_type, clean=argv.clean,
              singlesubs=argv.singlesubs,

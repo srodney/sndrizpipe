@@ -8,9 +8,50 @@ import exceptions
 from stsci import tools
 from drizzlepac import tweakreg, astrodrizzle
 
-          
+def hotpixPostargClean( flt1, flt2, verbose=False ):
+    """
+    Remove all CR flags from a pair of WFC3-IR flt DQ arrays except those that
+    are most likely unflagged hot pixels, identified by getting a 4096 flag in
+    both exposures.
+
+    :param fltlist: a list of WFC3 IR flt files from a single dither sequence
+       that already have 4096 CR flags in their DQ arrays from astrodrizzle
+    :return:
+    """
+    import numpy as np
+    im1 = pyfits.open( flt1, mode='update' )
+    im2 = pyfits.open( flt2, mode='update' )
+
+    dq1 = im1[3].data
+    dq2 = im2[3].data
+
+    crflags1 = dq1 & 4096
+    crflags2 = dq2 & 4096
+    hotpixflags = ( ( crflags1 & crflags2 ) / 4096 ) * 16
+
+    icrflags1 = np.where( crflags1 )
+    icrflags2 = np.where( crflags2 )
+
+    im1[3].data[ icrflags1 ] -= 4096
+    im2[3].data[ icrflags2 ] -= 4096
+
+    im1[3].data += hotpixflags
+    im2[3].data += hotpixflags
+
+    if verbose :
+        ncr1 = len( np.where( np.ravel(crflags1) )[0] )
+        ncr2 = len( np.where( np.ravel(crflags2) )[0] )
+        nhotpix = len( np.where( np.ravel(hotpixflags) )[0] )
+        print( "Removed (%i,%i) CR flags, and re-flagged %i as hot pixels"%(ncr1,ncr2,nhotpix) )
+
+    im1.flush()
+    im1.close()
+    im2.flush()
+    im2.close()
+
+
 def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True, 
-                    clobber=False, verbose=True, debug=False ):
+                  driz_cr_snr='5.0 4.5', clobber=False, verbose=True, debug=False ):
     """Run astrodrizzle with almost-default parameters to make a
     native-scale unrotated drz_sci.fits image.
     
@@ -56,7 +97,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         restore=(not clobber), preserve=True, overwrite=clobber, clean=clean,
         median=docombine, blot=(driz_cr>0 and docombine),
         driz_cr=(driz_cr>0 and docombine),
-        combine_type='iminmed',
+        combine_type='iminmed', driz_cr_snr=driz_cr_snr,
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
         driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'], 
@@ -78,7 +119,8 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
 
 def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
-                   ra=None, dec=None, rot=0, imsize_arcsec=None, driz_cr=False,
+                   ra=None, dec=None, rot=0, imsize_arcsec=None,
+                   naxis12=None, driz_cr=False,  driz_cr_snr='5.0 4.5',
                    singlesci=False, pixscale=None, pixfrac=None,
                    wht_type='IVM', combine_type='iminmed',
                    clean=True, clobber=False, verbose=True, debug=False ) :
@@ -122,7 +164,6 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
 
     if not pixscale : pixscale = drizpar['pixscale']
     if not pixfrac : pixfrac = drizpar['pixfrac']
-    if not imsize_arcsec : imsize_arcsec = drizpar['imsize_arcsec']
 
     # the ra and the dec are the desired ra and dec for the center of the frame
     if ra==None and dec==None and refimage=='' :
@@ -148,21 +189,29 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             # an odd number of pixels for the median each time
             combine_nhigh =  (1 + nflt%2)*( 1 + 2*(nflt>7)*(1-nflt%2) + (nflt>11)*(nflt%2))
 
-    imsize_pix = imsize_arcsec/pixscale                     
+    if imsize_arcsec is None and naxis12 is None :
+        imsize_arcsec = drizpar['imsize_arcsec']
+    if naxis12 is not None :
+        naxis1 = int(naxis12.split(',')[0])
+        naxis2 = int(naxis12.split(',')[1])
+    else :
+        naxis1 = imsize_arcsec/pixscale
+        naxis2 = imsize_arcsec/pixscale
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, build=False, resetbits=(driz_cr and 4096),
         restore=False, preserve=True, overwrite=True, clean=clean,
-        median=docombine, blot=docombine, driz_cr=(driz_cr>0 and docombine),
+        median=docombine, blot=docombine,
+        driz_cr=(driz_cr>0 and docombine),  driz_cr_snr=driz_cr_snr,
         combine_type=combine_type, combine_nhigh=combine_nhigh,
         driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
         driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
         driz_sep_bits=drizpar['drizbits'],
-        driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix,
+        driz_sep_outnx=naxis1, driz_sep_outny=naxis2,
         final_wcs=True, final_pixfrac=pixfrac, final_scale=pixscale,
         final_bits=drizpar['drizbits'],
         final_ra=ra, final_dec=dec, final_rot=rot,
-        final_outnx=imsize_pix, final_outny=imsize_pix,
+        final_outnx=naxis1, final_outny=naxis2,
         final_wht_type=wht_type )
                     
     if fltlist[0].find('_flc.fits')>0  : drzsfx = '_drc'
@@ -187,7 +236,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             driz_sep_wcs=True, driz_sep_pixfrac=1.0, driz_sep_scale=pixscale,
             driz_sep_ra=ra, driz_sep_dec=dec, driz_sep_rot=rot,
             driz_sep_bits=drizpar['drizbits'],
-            driz_sep_outnx=imsize_pix, driz_sep_outny=imsize_pix )
+            driz_sep_outnx=naxis1, driz_sep_outny=naxis2 )
         # give the output single_sci.fits files some more helpful names
         for fltfile in fltlist :
             if fltfile.endswith('_flc.fits') :

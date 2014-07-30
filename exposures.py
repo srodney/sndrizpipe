@@ -313,7 +313,7 @@ class Exposure( object ):
             filename = flcfile
         else :
             filename = flcfile.replace( 'flc.fits','flt.fits' )
-        assert( os.path.exists(filename))
+        # assert( os.path.exists(filename))
         self.filename = os.path.basename( filename )
         self.filepath = os.path.abspath( filename )
         self.outroot = outroot
