@@ -170,7 +170,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         else :
             print("Updating %s with new flt files detected in %s"%(epochlistfile,fltdir))
             explist_all = exposures.update_epochs( explist_all, fltlist, epochspan=epochspan,
-                                                   mjdmin=mjdmin, mjdmax=mjdmax )
+                                                   mjdmin=mjdmin, mjdmax=mjdmax,
+                                                   targetradec=[ra,dec] )
             exposures.print_epochs( explist_all, outfile=epochlistfile,
                                     verbose=verbose, clobber=clobber,
                                     onlyfilters=None, onlyepochs=None )
