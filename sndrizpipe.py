@@ -491,13 +491,14 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                 os.chdir( topdir )
                 continue
 
+            # Always use imedian combination for WFC3-IR.  For ACS or UVIS,
             # use imedian combination for bright stars (where high poisson noise
             # leads to flux suppression for iminmed) and for cases where we
             # have a large number of input flts.  Otherwise, iminmed is safer
             # and does not introduce a bias.
-            combine_type='iminmed'
-            if singlestar or len(fltlistFE)>7:
-                combine_type='imedian'
+            combine_type='imedian'
+            if explistFE[0].camera!='WFC3-IR' and not singlestar and len(fltlistFE)<7:
+                combine_type='iminmed'
 
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
