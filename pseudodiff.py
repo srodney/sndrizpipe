@@ -263,9 +263,16 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
         assert os.path.isfile( tempfile2 )
 
     outfile = os.path.join( tempdir, '%s_~%s_e%02i_reg_drc_sci.fits'%(targname, targfilter, tempepoch) )
-    tempsci, tempwht, tempbpx = mkscaledtemplate(
-        targetcamfilter, tempfile, imfile2=tempfile2, outfile=outfile,
-        filtdir=filtdir, verbose=verbose, clobber=clobber )
+
+    if os.path.exists( outfile ) and not clobber :
+        print("Template file %s already exists, not clobbering."%outfile)
+        tempsci = outfile
+        tempwht = tempsci.replace('sci.fits','wht.fits')
+        tempbpx = tempsci.replace('sci.fits','bpx.fits')
+    else :
+        tempsci, tempwht, tempbpx = mkscaledtemplate(
+            targetcamfilter, tempfile, imfile2=tempfile2, outfile=outfile,
+            filtdir=filtdir, verbose=verbose, clobber=clobber )
 
     subsci = '%s_%s_e%02i-e%02i_sub_sci.fits'%(targname, targfilter, targepoch, tempepoch)
     subsci = os.path.join( targdir, subsci )
