@@ -325,6 +325,15 @@ class Exposure( object ):
             self.fltsuffix = 'flc'
             self.drzsuffix = 'drc'
 
+        if self.rootname.startswith('j'):
+            self.camera = 'ACS-WFC'
+        elif self.fltsuffix == 'flc' :
+            self.camera = 'WFC3-UVIS'
+        elif self.filter[1] != '1':
+            self.camera = 'WFC3-UVIS'
+        else :
+            self.camera = 'WFC3-IR'
+
         self.pidvisit = '%i_%s'%(self.pid, self.visit)
 
         # 2-digits uniquely identifying this visit and this exposure
