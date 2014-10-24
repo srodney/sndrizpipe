@@ -349,14 +349,14 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         if verbose :
             print("sndrizpipe : (3) DRIZ1 : first astrodrizzle pass.")
         for FEVgroup in FEVgrouplist :
-            explistFEV = [ exp for exp in explist if exp.FEVgroup == FEVgroup ]
+            explistFEV = [ exp for exp in explist if exp.FEVgroup==FEVgroup ]
             thisepoch = explistFEV[0].epoch
             thisfilter = explistFEV[0].filter
             if onlyepochs and thisepoch not in onlyepochs : continue
             if onlyfilters and thisfilter not in onlyfilters : continue
 
             epochdir = explistFEV[0].epochdir
-            fltlistFEV = [ exp.filename for exp in explistFEV ] 
+            fltlistFEV = [ exp.filename for exp in explistFEV ]
             outrootFEV = '%s_%s_nat'%(outroot,FEVgroup)
 
             os.chdir( epochdir )
@@ -842,6 +842,7 @@ def mkparser():
     regpar.add_argument('--sigmaclip', metavar='3.0', type=float, help='Clipping limit in sigmas, for catalog matching',default=3.0)
 
     driz2par = parser.add_argument_group( "(5) Settings for final astrodrizzle stage" )
+    driz2par.add_argument('--radec', metavar='X,Y', type=str, help='R.A.,Dec for center of output image (decimal degrees)', default=None)
     driz2par.add_argument('--ra', metavar='X', type=float, help='R.A. for center of output image', default=None)
     driz2par.add_argument('--dec', metavar='X', type=float, help='Decl. for center of output image', default=None)
     driz2par.add_argument('--rot', metavar='0', type=float, help='Rotation (deg E of N) for output image', default=0.0)
@@ -875,6 +876,12 @@ def main() :
         testpipe.colfaxtest( getflts=True, runpipeline=True )
         return 0
 
+    ra,dec = None, None
+    if argv.ra is not None and argv.dec is not None :
+        ra,dec = argv.ra, argv.dec
+    elif argv.radec is not None :
+        ra,dec = [ float(x) for x in argv.radec.split(',') ]
+
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
              onlyepochs=(argv.epochs or []),
@@ -898,7 +905,7 @@ def main() :
              singlestar=argv.singlestar,
              mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
              epochspan=argv.epochspan,
-             ra=argv.ra, dec=argv.dec, rot=argv.rot,
+             ra=ra, dec=dec, rot=argv.rot,
              imsize_arcsec=argv.imsize, naxis12=argv.naxis12,
              pixscale=argv.pixscale, pixfrac=argv.pixfrac,
              wht_type=argv.wht_type, clean=argv.clean,
