@@ -82,8 +82,9 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     # drizzlepac driz_cr step will flag sky noise as CRs.
     if len(fltlist) < 5 :
         etimelist = [ pyfits.getval(flt,'EXPTIME') for flt in fltlist ]
-        if max( etimelist ) / min( etimelist ) > 10 :
-            driz_cr = -1
+        if len(etimelist)>1:
+            if max( etimelist ) / min( etimelist ) > 10 :
+                driz_cr = -1
 
     # define the default astrodrizzle parameters for this camera
     instrument = hdr['INSTRUME']

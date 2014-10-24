@@ -341,7 +341,7 @@ class Exposure( object ):
         self.viscode = self.rootname[4:6].upper()
         assert( self.expid == self.rootname[-3:-1] )
 
-        if self.epoch==-1 :
+        if self.epoch==-1 or self.exptime<=1e-6 :
             self.ontarget = False
         else :
             self.ontarget=True
@@ -428,21 +428,24 @@ class Exposure( object ):
         self.epoch  = 99
 
         # if target ra,dec provided, check that the source is on the image
-        self.ontarget=True
         self.darcsec = -1
-        if targetradec[0] is not None and targetradec[1] is not None:
-            if self.camera=='ACS-WFC': buffer=50
-            else : buffer=20
-            try :
-                onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
-            except :
-                print("Problem determining position relative to image %s "%self.rootname)
-                import pdb; pdb.set_trace()
-                onimage, darcsec = False, -99
-            if not onimage :
-                self.epoch=-1
-                self.ontarget = False
-            self.darcsec = darcsec
+        if self.exptime<=1e-6 :
+            self.ontarget=False
+        else :
+            self.ontarget=True
+            if targetradec[0] is not None and targetradec[1] is not None:
+                if self.camera=='ACS-WFC': buffer=50
+                else : buffer=20
+                try :
+                    onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
+                except :
+                    print("Problem determining position relative to image %s "%self.rootname)
+                    import pdb; pdb.set_trace()
+                    onimage, darcsec = False, -99
+                if not onimage :
+                    self.epoch=-1
+                    self.ontarget = False
+                self.darcsec = darcsec
 
     @property
     def epochdir( self ):
