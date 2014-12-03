@@ -251,8 +251,12 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     else :
         darcsec = np.sqrt( ((ra-exp.ratarg)*np.cos(pywcs.DEGTORAD(dec)))**2 + (dec-exp.dectarg)**2 ) * 3600
     for hdr in exp.headerlist :
-        expwcs = pywcs.WCS( hdr, hdulist )
-        ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
+        try :
+            expwcs = pywcs.WCS( hdr, hdulist )
+            ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
+        except AssertionError :
+            expwcs = pywcs.WCS( hdr )
+            ix,iy = expwcs.wcs_sky2pix( ra, dec, 0 )
         if ix<-buffer or ix>hdr['NAXIS1']+buffer : continue
         if iy<-buffer or iy>hdr['NAXIS2']+buffer : continue
         onimage=True
@@ -440,8 +444,8 @@ class Exposure( object ):
                     onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
                 except :
                     print("Problem determining position relative to image %s "%self.rootname)
-                    import pdb; pdb.set_trace()
-                    onimage, darcsec = False, -99
+                    # import pdb; pdb.set_trace()
+                    onimage, darcsec = True, -99
                 if not onimage :
                     self.epoch=-1
                     self.ontarget = False
