@@ -1,5 +1,8 @@
  
 #define _WDIM_ 999      /* maximum number of traps ; don't touch  */
+
+
+c modified 2014.09.23 to preserve the extra extensions in cowritfits_flt
  
 c#define _LINUX_ .true.  /* true if this is an INTEL machine       */
 c                        /* false if it is solaris like or         */
@@ -1438,16 +1441,8 @@ c
  
       real    fcarry
       real    fcarry0
-      integer NRUN
-      common /NRUN_/NRUN
-      data    NRUN/0/
- 
-      NRUN = NRUN + 1
-      if (NRUN.ge.NITs) NRUN = 0
- 
-      fcarry0 = NRUN*1.00/NITs                ! this allows us to start with various amounts of
-                                              ! fractional electrons, just to mix things up
-                                              ! the routine only deals with whole electrons now
+
+      fcarry0 = 0.00
  
       if (Ws.gt._WDIM_) stop 'Ws.gt._WDIM_'   ! more traps than we are allowed
  
@@ -3179,12 +3174,35 @@ c
           i =  i2
          ii = ii2
          endif
- 
+
+c
+c new code after 2014.09.23 
+c
       if (NREAD.eq.6) then
+  800    continue
+         i  = i  + 1
+         read(10,rec=i,iostat=ios) buffc
+         if (ios.eq.0) then
+            ii = ii + 1
+            print*,'add: i=',i,' ----- ii=',ii
+            write(11,rec=ii,iostat=ios) buffc
+            goto 800
+            endif
          close(10)
          close(11)
          return
          endif
+
+
+c
+c old code before 2014.09.23 
+c
+c      if (NREAD.eq.6) then
+c         close(10)
+c         close(11)
+c         return
+c         endif
+c
  
  
       if (VERBOSE) print*,'  NREAD: ',NREAD

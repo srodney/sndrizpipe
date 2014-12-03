@@ -1,6 +1,27 @@
+
+c
+c this is the current version:
+c
+c wfc3uv_ctereverse_wSUB.F.2014.09.12
+c
+
  
 #define _WDIM_ 999      /* maximum number of traps ; don't touch  */
- 
+
+c-----------------------------------------------------------------------
+c-----------------------------------------------------------------------
+c
+c UPDATES:
+c
+c Nov  14, 2014:  set things up to operate on some full-amp QUAD filters
+c Nov  14, 2014:  removed fcarry0 variation (to ensure repeatability)
+c 
+c Sept 12, 2014:  add subarrays c512a, c512b, c512d 
+c                 (c512c was already there...)
+c Sept 23, 2014:  modified to preserve the extra header
+c                 info in the output flc file.
+c 
+c-----------------------------------------------------------------------
  
 c
 c this particular version has been reformulated to
@@ -9,7 +30,25 @@ c "rac" files for the subarrays, but it will output
 c "flc" files for them, if the user supplies an "flt"
 c image (along with the "raw" image, of course)
 c
- 
+c
+c subarray apertures for which this should work:
+c
+c NAP NAPu NAME               APERTURE=            EXAMPLE IMAGE
+c --- ---- ----------------   ------------------   ------------------- 
+c 01  (01) FULL FRAME
+c 02  (02) UVIS1-2K4-SUB      'UVIS1-2K4-SUB   '   ibnc04n3q_raw.fits                                                              
+c 03  (03) UVIS1-2K2A-SUB     'UVIS1-2K2A-SUB  '   ibqk07clq_raw.fits
+c 04  (04) UVIS1-2K2B-SUB     'UVIS1-2K2B-SUB  '   ibsp10xvq_raw.fits
+c 05  (05) UVIS2-2K2C-SUB     'UVIS2-2K2C-SUB  '   ibqt04pkq_raw.fits
+c 06  (06) UVIS2-C1K1C-SUB    'UVIS2-C1K1C-SUB '   ibqt03m9q_raw.fits
+c 07  (07) UVIS2-C512C-SUB    'UVIS2-C512C-SUB '   ibt401flq_raw.fits
+c 08  (07) UVIS2-C512D-SUB    'UVIS2-C512D-SUB '   ibbszjb7q_raw.fits
+c 09  (07) UVIS1-C512A-SUB    'UVIS1-C512A-SUB '   ibuc51auq_raw.fits
+c 10  (07) UVIS1-C512B-SUB    'UVIS1-C512B-SUB '   ibbsz8qyq_raw.fits
+c-----------------------------------------------------------
+c UNSUPPPORTED  UVIS2-M1K1C-SUB (no reference pixels) 
+c-----------------------------------------------------------
+
  
 c-----------------------------------------------------------
 c QUICK-START ADVICE
@@ -605,7 +644,7 @@ c
  
          call fitshead2string(FILE_RAW,RAW_HEADER)
          call sub_wfc3uv_read_raw(FILE_RAW,pixz_raw)
- 
+
          CTE_FF = find_FF(RAW_HEADER,DATE_STRING,rDATu,rDAT0,rDAT1)
          print*,'                  '
          print*,'     DATE_STRING: ',DATE_STRING
@@ -1443,16 +1482,8 @@ c
  
       real    fcarry
       real    fcarry0
-      integer NRUN
-      common /NRUN_/NRUN
-      data    NRUN/0/
- 
-      NRUN = NRUN + 1
-      if (NRUN.ge.NITs) NRUN = 0
- 
-      fcarry0 = NRUN*1.00/NITs                ! this allows us to start with various amounts of
-                                              ! fractional electrons, just to mix things up
-                                              ! the routine only deals with whole electrons now
+
+      fcarry0 = 0.0
  
       if (Ws.gt._WDIM_) stop 'Ws.gt._WDIM_'   ! more traps than we are allowed
  
@@ -1586,6 +1617,8 @@ c
  
       logical VERBOSE
       common /VERBOSE_/VERBOSE
+
+      real*8 tot
 c
 c--------------------------------------
 c
@@ -1598,6 +1631,7 @@ c
       do i = 0001, 8412
       do j = 0001, 2070
          pixz_fff(i,j) = CTE_FF*j/2048.00
+         pixz_rac(i,j) = pixz_raz(i,j)
          enddo
          enddo
  
@@ -1606,9 +1640,13 @@ c
       NITINVs = _NITERN_
       NITCTEs = _NITCTE_
       do i = 0001, 8412                                               ! go thru all 8412 columns, including the
-         do j = 0001, 2070                                            ! horizontal pre/post scan
+         tot = 0.
+         do j = 0001, 2070                                            !    horizontal pre/post scan
             pix_obsd(j) = pixz_raz(i,j)
+            tot = tot + abs(pix_obsd(j))
             enddo
+         if (tot.le.1) goto 9998                                      ! skip, no signal in this column
+         
          if (VERBOSE)
      .   write(*,2117) i,(int(pix_obsd(j)+1000.5)-1000,j=2020,2060)
          NREDO = 0
@@ -1735,6 +1773,7 @@ c
  2127       format(5x,i4.4,3(5x,11i6))
  2128       format(5x,'ICOL',3(5x,'J=',i4,10i6))
             endif
+ 9998    continue
          enddo!i
  
       return
@@ -1776,6 +1815,7 @@ c
       character*80 STRING_HEAD(360)
       integer i, j
       character*20 APERTURE
+      character*4  CCDAMP
       integer h, k
       integer NREPLACE
       integer Ls, Lu
@@ -1786,21 +1826,28 @@ c
  
       do i = 0001, 8412
       do j = 0001, 2070
-         pixz_raw(i,j) = -99999
+         pixz_raw(i,j) = -999
          enddo
          enddo
+
+
  
       call fitshead2string(FILEI,STRING_HEAD)
       APERTURE = 'NONE'
+      CCDAMP   = 'NONE'
       do h = 001, 360
          if (STRING_HEAD(h)(01:10).eq.'APERTURE= ')
      .       read(STRING_HEAD(h)(11:30),*) APERTURE
+         if (STRING_HEAD(h)(01:10).eq.'CCDAMP  = ')
+     .       read(STRING_HEAD(h)(11:30),*) CCDAMP
          enddo
+      print*,'          CCDAMP         : ',CCDAMP
       print*,'          APERTURE       : ',APERTURE
       print*,'          APERTURE(01:01): ',APERTURE(01:01)
       print*,'          APERTURE(02:12): ',APERTURE(02:12)
       if (APERTURE(01:01).eq.' ') APERTURE = APERTURE(02:20)
       print*,'          APERTURE(01:12): ',APERTURE(01:12)
+      if (CCDAMP.eq.'ABCD') then
       if (APERTURE(01:06).eq.'UVIS  '.or.
      .    APERTURE(01:06).eq.'UVIS1 '.or.
      .    APERTURE(01:06).eq.'UVIS2 '.or.
@@ -1832,8 +1879,15 @@ c
              enddo
           goto 1
           endif
+          endif
+
+
+
+
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB') then
+      if (CCDAMP.eq.'A   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_i2e(FILEI,pixa,2070,2050,1)
           do i = 0001, 2070
           do j = 0001, 2050
@@ -1842,8 +1896,11 @@ c
              enddo
           goto 1
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB') then
+      if (CCDAMP.eq.'B   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_i2e(FILEI,pixa,2070,2050,1)
           do i = 0001, 2070
           do j = 0001, 2050
@@ -1852,8 +1909,11 @@ c
              enddo
           goto 1
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB') then
+      if (CCDAMP.eq.'C   ') then
+      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_i2e(FILEI,pixa,2070,2050,1)
           do i = 0001, 2070
           do j = 0001, 2050
@@ -1861,6 +1921,7 @@ c
              enddo
              enddo
           goto 1
+          endif
           endif
  
       if (APERTURE(01:13).eq.'UVIS1-2K4-SUB') then
@@ -1873,6 +1934,11 @@ c
           do i = 2072, 4119
           do j = 0001, 2050
              pixz_raw(026+(4119-i)+3*2103,2052-j) = pixb(i,j) + 32768.
+             enddo
+             enddo
+          do i = 0001, 0023  ! fake the pre-scan
+          do j = 0001, 2050
+             pixz_raw(0002+i+3*2103,2052-j) = pixb(i,j) + 32768.
              enddo
              enddo
           goto 1
@@ -1888,6 +1954,7 @@ c
           goto 1
           endif
  
+
       if (APERTURE(01:15).eq.'UVIS2-C512C-SUB') then
           call readfits_i2e(FILEI,pixd,536,512,1)
           do i = 0001, 0536
@@ -1897,8 +1964,43 @@ c
              enddo
           goto 1
           endif
- 
-      stop 'sub_wfc3uv_read_raw:  aperture not found'
+
+      if (APERTURE(01:15).eq.'UVIS2-C512D-SUB') then
+          call readfits_i2e(FILEI,pixd,536,512,1)
+          do i = 0001, 0536
+          do j = 0001, 0512
+             pixz_raw(2+i+1*2103,j+1) = pixd(537-i,j) + 32768.
+             enddo
+             enddo
+          goto 1
+          endif
+
+      if (APERTURE(01:15).eq.'UVIS1-C512A-SUB') then
+          call readfits_i2e(FILEI,pixd,536,512,1)
+          do i = 0001, 0536
+          do j = 0001, 0512
+             pixz_raw(2+i+2*2103,j+1) = pixd(i,513-j) + 32768.
+             enddo
+             enddo
+          goto 1
+          endif
+
+      if (APERTURE(01:15).eq.'UVIS1-C512B-SUB') then
+          call readfits_i2e(FILEI,pixd,536,512,1)
+          do i = 0001, 0536
+          do j = 0001, 0512
+             pixz_raw(2+i+3*2103,j+1) = pixd(537-i,513-j) + 32768.
+             enddo
+             enddo
+          goto 1
+          endif
+
+      print*,'PROBLEM in sub_wfc3uv_read_raw'
+      print*,'   APERTURE NOT FOUND: '
+      print*,'             APERTURE: ',APERTURE
+      print*,'               CCDAMP: ',CCDAMP
+      stop
+  
  
  
 c-----------------------------------------------------------------
@@ -1911,6 +2013,9 @@ c fill these pixels, starting with using values in the
 c same amp, then same chip...
 c
     1 continue
+
+      if (.true.) return
+
       NREPLACE = 0
       do k = 1, 4                ! next try using values in the same amp
          Ls = 0
@@ -1978,8 +2083,6 @@ c****
 c*********************************************
                                               
  
- 
- 
 c-------------------------------------------------
 c
 c Does the blev correction to go from a raw image
@@ -2012,7 +2115,7 @@ c
  
       real plist(12420)
  
-      real bs_ik
+      real bs_ik, rclip
  
       character ampk(4)
       common /ampk_/ampk
@@ -2052,8 +2155,10 @@ c
          do i = 01, 25
             Ls = 0
             do j = 0001, 2048
-               Ls = Ls + 1
-               plist(Ls) = pixz_raw(i+(k-1)*2103,j)
+               if (pixz_raw(i+(k-1)*2103,j).gt.0) then
+                  Ls = Ls + 1
+                  plist(Ls) = pixz_raw(i+(k-1)*2103,j)
+                  endif
                enddo
             call barsig(plist,Ls,bar,sig,Lu)
             colbar(i) = bar
@@ -2063,7 +2168,9 @@ c
             enddo
          colbarbar = (colbar(20)+colbar(21)+colbar(22)
      .               +colbar(23)+colbar(24)+colbar(25))/6.0
-         write(*,112) k,ampk(k),'AVG',(colbar(i)-colbarbar,i=1,25)
+         write(*,112) k,ampk(k),'AVG',(rclip(colbar(i)
+     .                                      -colbarbar,-999.,999.),
+     .                                       i=1,25)
          write(*,112) k,ampk(k),'RMS',(colsig(i),i=1,25)
          if (VERBOSE) then
             write(*,113) k,ampk(k),'TOT',(colnnn(i),i=1,25)
@@ -2077,8 +2184,10 @@ c
          Ls = 0
          do i = 20, 25
             do j = 0001, 2070
-               Ls = Ls + 1
-               plist(Ls) = pixz_raw(i+(k-1)*2103,j)
+               if (pixz_raw(i+(k-1)*2103,j).gt.0) then
+                  Ls = Ls + 1
+                  plist(Ls) = pixz_raw(i+(k-1)*2103,j)
+                  endif
                enddo
             enddo
          call barsig(plist,Ls,bar,sig,Lu)
@@ -2140,6 +2249,12 @@ c
       print*,'    CORRECT HORIZONTAL BIAS GRADIENT (SUPP)'
       call pixz_fix(pixz_raz) ! an additional bias-shift fix
       print*,'     '
+
+      do i = 0001, 8412
+      do j = 0001, 2070
+         if (pixz_raz(i,j).lt.-500) pixz_raz(i,j) = 0.00
+         enddo
+         enddo
  
       end
  
@@ -2186,6 +2301,11 @@ c
       integer NIT
       real*8  rms
       integer nrms
+
+      integer IMINU, IMAXU
+      integer JMINU, JMAXU
+      integer ISHO
+      integer JSHO1, JSHO2
  
       print*,'                                                         '
       print*,'    ENTER wfc3uv_raz2rsz... RNSIG: ',RNSIG
@@ -2202,9 +2322,20 @@ c
       print*,'                                                         '
 
 c     call writfits_r4('pixz_obs.fits',pixz_obs,8412,2070)
+
+      IMINU = 8412
+      IMAXU = 0001
+      JMINU = 2070
+      JMAXU = 0001
  
       do i = 0001, 8412
       do j = 0001, 2070
+         if (abs(pixz_obs(i,j)).gt.0.1) then
+            if (i.lt.IMINU) IMINU = i
+            if (i.gt.IMAXU) IMAXU = i
+            if (j.lt.JMINU) JMINU = j
+            if (j.gt.JMAXU) JMAXU = j
+            endif
          if (.not.(pixz_obs(i,j).gt.-99999.)) then
             print*,'CORRUPTION! '
             print*,'   i: ',i
@@ -2217,9 +2348,19 @@ c     call writfits_r4('pixz_obs.fits',pixz_obs,8412,2070)
          pixz_adj(i,j) = 0.
          enddo
          enddo
+
+      ISHO  = IMINU+20
+      JSHO1 = JMAXU-25-4
+      JSHO2 = JMAXU-25+4
  
       if (RNSIG.lt.0.1) return ! no readnoise mitigation needed
- 
+
+      print*,'              '
+      print*,'IMINU/IMAXU : ',IMINU,IMAXU 
+      print*,'JMINU/JMAXU : ',JMINU,JMAXU 
+      print*,'       ISHO : ',ISHO
+      print*,'JSHO1/JSHO2 : ',JSHO1,JSHO2
+      print*,'              '
  
 c-----------------------------------------------------------
 c
@@ -2231,9 +2372,9 @@ c down the line.
 c
       write(*,*)
       write(*,109) ' ORIG ',' DIFF ','  NEW '
-      write(*,108) (jj,jj=2000-4,2000+4),
-     .             (jj,jj=2000-4,2000+4),
-     .             (jj,jj=2000-4,2000+4)
+      write(*,108) (jj,jj=JSHO1,JSHO2),
+     .             (jj,jj=JSHO1,JSHO2),
+     .             (jj,jj=JSHO1,JSHO2)
   108 format(5x,' NIT',1x,'chgd RMS',
      .                    ' NPIXUSED ',
      .                    ' ICOL',
@@ -2244,24 +2385,28 @@ c
      .               3(5x,24x,a6,24x))
       rms = 0.
       nrms = 0.
-      do NIT = 001, 100
-         do i = 0001, 8412
-         do j = 0001, 2070
+      do NIT = 01, 75
+c        do i = 0001, 8412
+c        do j = 0001, 2070
+         do i = IMINU, IMAXU
+         do j = JMINU, JMAXU
             pval = pixz_mod(i,j)
             pixz_adj(i,j) = 0.0
             d = find_dadj(i,j,pixz_obs,pixz_mod,RNSIG)
             pixz_adj(i,j) = d
-            if (j.eq.2000.and.i.eq.0020)
+            if (j.eq.JSHO1.and.i.eq.ISHO)
      .      write(*,119) NIT,rms,nrms,i,
-     .             (min(pixz_obs(i,jj),999.9),jj=j-4,j+4),
+     .             (min(pixz_obs(i,jj),999.9),jj=JSHO1,JSHO2),
      .             (min(pixz_obs(i,jj)
-     .                 -pixz_mod(i,jj),999.9),jj=j-4,j+4),
-     .             (min(pixz_mod(i,jj),999.9),jj=j-4,j+4)
+     .                 -pixz_mod(i,jj),999.9),jj=JSHO1,JSHO2),
+     .             (min(pixz_mod(i,jj),999.9),jj=JSHO1,JSHO2)
   119       format(5x,i4,1x,f8.4,1x,i8,1x,i5.4,3(5x,9f6.1))
             enddo
             enddo
-         do i = 0001, 8412
-         do j = 0001, 2070
+c        do i = 0001, 8412
+c        do j = 0001, 2070
+         do i = IMINU, IMAXU
+         do j = JMINU, JMAXU
             pixz_mod(i,j) = pixz_mod(i,j) + pixz_adj(i,j)*0.75
             pixz_noi(i,j) = pixz_obs(i,j) - pixz_mod(i,j)
             enddo
@@ -2740,6 +2885,7 @@ c
       character*80 STRING_HEAD(360)
       character*20 APERTURE
       integer h
+      character*4  CCDAMP
  
 c
 c--------------------------------------------------------
@@ -2747,23 +2893,14 @@ c
  
       call fitshead2string(FILEI,STRING_HEAD)
       APERTURE = 'NONE'
+      CCDAMP   = 'NONE'
       do h = 001, 360
          if (STRING_HEAD(h)(01:10).eq.'APERTURE= ')
      .       read(STRING_HEAD(h)(11:30),*) APERTURE
+         if (STRING_HEAD(h)(01:10).eq.'CCDAMP  = ')
+     .       read(STRING_HEAD(h)(11:30),*) CCDAMP
          enddo
-      if (APERTURE(01:06).ne.'UVIS  '.and.
-     .    APERTURE(01:06).ne.'UVIS1 '.and.
-     .    APERTURE(01:06).ne.'UVIS2 '.and.
-     .    APERTURE(01:09).ne.'UVIS-FIX '.and.
-     .    APERTURE(01:09).ne.'UVIS1-FIX'.and.
-     .    APERTURE(01:09).ne.'UVIS2-FIX'.and.
-     .    APERTURE(01:09).ne.'G280-REF '.and.
-     .    APERTURE(01:09).ne.'UVIS-QUAD'.and.
-     .    APERTURE(01:11).ne.'UVIS-CENTER'.and.
-     .    APERTURE(01:11).ne.'UVIS-IR-FIX'.and.
-     .    APERTURE(01:12).ne.'UVIS1-IR-FIX'.and.
-     .    APERTURE(01:12).ne.'UVIS2-IR-FIX'.and.
-     .    APERTURE(01:13).ne.'UVIS-QUAD-FIX') then
+      if (CCDAMP.ne.'ABCD') then
           print*,'                                              '
           print*,'CANNOT PRODUCE RAC IMAGE FOR SUBARRAY IMAGE...'
           print*,'MOVING ON TO NEXT STEP...                     '
@@ -2879,12 +3016,37 @@ c
  
  
       if (VERBOSE) print*,'PROCESS... NREAD: ',NREAD
- 
+
+
+
+c
+c new code from 2014.09.23:  write out all the extra
+c     extensions
+c
       if (NREAD.eq.6) then
+  800    continue
+         i  = i  + 1
+         read(10,rec=i,iostat=ios) buffc
+         if (ios.eq.0) then
+            ii = ii + 1
+            print*,'add: i=',i,' ----- ii=',ii
+            write(11,rec=ii,iostat=ios) buffc
+            goto 800
+            endif
          close(10)
          close(11)
          return
          endif
+
+c
+c old code from before 2014.09.23
+c 
+c      if (NREAD.eq.6) then
+c         close(10)
+c         close(11)
+c         return
+c         endif
+c
  
       if (NREAD.eq.1.or.NREAD.eq.4) then
          if (laxis(1).ne.4206.or.laxis(2).ne.2070)
@@ -3077,6 +3239,7 @@ c
  
       character*80 STRING_HEAD(360)
       character*20 APERTURE
+      character*4  CCDAMP
 c
 c--------------------------------------------------------
 c
@@ -3091,12 +3254,16 @@ c
       print*,' pixz_flc(1049+2*2103,1024): ',pixz_flc(1049+2*2103,1024)
       print*,' pixz_flc(1049+3*2103,1024): ',pixz_flc(1049+3*2103,1024)
       print*,' '
- 
+
+
       call fitshead2string(FILE_FLT,STRING_HEAD)
       APERTURE = 'NONE'
+      CCDAMP   = 'NONE'
       do h = 001, 360
          if (STRING_HEAD(h)(01:10).eq.'APERTURE= ')
      .       read(STRING_HEAD(h)(11:30),*) APERTURE
+         if (STRING_HEAD(h)(01:10).eq.'CCDAMP  = ')
+     .       read(STRING_HEAD(h)(11:30),*) CCDAMP
         !write(*,'(i3.3,10x,a80,10x,a20)') h,STRING_HEAD(h),APERTURE
          enddo
       print*,'          APERTURE       : ',APERTURE
@@ -3107,7 +3274,10 @@ c
       if (APERTURE(01:01).eq.' ') APERTURE = APERTURE(02:20)
       if (APERTURE(01:01).eq.' ') APERTURE = APERTURE(02:20)
       print*,'          APERTURE(01:12): ',APERTURE(01:12)
+      print*,'          APERTURE(01:15): ',APERTURE(01:15)
  
+      NAPu = 0
+
       if (APERTURE(01:06).eq.'UVIS  '.or.
      .    APERTURE(01:06).eq.'UVIS1 '.or.
      .    APERTURE(01:06).eq.'UVIS2 '.or.
@@ -3137,6 +3307,9 @@ c
              enddo
              enddo
           endif
+
+
+
  
       if (APERTURE(01:13).eq.'UVIS1-2K4-SUB') then
           NAPu = 2
@@ -3152,7 +3325,9 @@ c
              enddo
           endif
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB') then
+      if (CCDAMP.eq.'A   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           NAPu = 3
           do j = 0001, 2050
           do i = 0001, 2047
@@ -3160,8 +3335,11 @@ c
              enddo
              enddo
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB') then
+      if (CCDAMP.eq.'B   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           NAPu = 4
           do j = 0001, 2050
           do i = 0001, 2047
@@ -3169,14 +3347,18 @@ c
              enddo
              enddo
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB') then
+      if (CCDAMP.eq.'C   ') then
+      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           NAPu = 5
           do j = 0001, 2050
           do i = 0001, 2047
              pixa(i,j) = pixz_flc(25+i-2+0*2103+2,j+1)
              enddo
              enddo
+          endif
           endif
  
       if (APERTURE(01:15).eq.'UVIS2-C1K1C-SUB') then
@@ -3193,6 +3375,33 @@ c
           do i = 0001, 0513
           do j = 0001, 0512
              pixy(i,j) = pixz_flc(25+i+0*2103,j+1)
+             enddo
+             enddo
+          endif
+ 
+      if (APERTURE(01:15).eq.'UVIS2-C512D-SUB') then
+          NAPu = 7
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixy(514-i,j) = pixz_flc(25+i+1*2103,j+1)
+             enddo
+             enddo
+          endif
+ 
+      if (APERTURE(01:15).eq.'UVIS1-C512A-SUB') then
+          NAPu = 7
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixy(i,513-j) = pixz_flc(25+i+2*2103,j+1)
+             enddo
+             enddo
+          endif
+ 
+      if (APERTURE(01:15).eq.'UVIS1-C512B-SUB') then
+          NAPu = 7
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixy(514-i,513-j) = pixz_flc(25+i+3*2103,j+1)
              enddo
              enddo
           endif
@@ -3268,6 +3477,8 @@ c
          write(11,rec=ii,iostat=ios) buffc
          endif
  
+
+      print*,'NAPu: ',NAPu
  
       write(*,'(6x,''cowritfits_flt: '',a18,''['',i1,'']'')')
      .                                  FILE_FLT(01:18),NREAD
@@ -3300,6 +3511,8 @@ c
          print*,' nbper: ',nbper
          print*,'   ii1: ',ii1
          print*,'   ii2: ',ii2
+         print*,'  NAPu: ',NAPu,pixy(1,1)
+         print*,'        '
  
          do ii = ii1, ii2, 1
             nbyte0 = (ii-iifirst)*2880+   1
@@ -3738,6 +3951,7 @@ c
       integer      h
       character*80 STRING_HEAD(360)
       character*20 APERTURE
+      character*04 CCDAMP
  
  
       print*,'     ENTER sub_wfc3uv_read_flt... ',FILE_FLT(1:50)
@@ -3753,9 +3967,12 @@ c     print*,'           APERTURE: ',APERTURE
  
       call fitshead2string(FILE_FLT,STRING_HEAD)
       APERTURE = 'NONE'
+      CCDAMP   = 'NONE'
       do h = 001, 360
          if (STRING_HEAD(h)(01:10).eq.'APERTURE= ')
      .       read(STRING_HEAD(h)(11:30),*) APERTURE
+         if (STRING_HEAD(h)(01:10).eq.'CCDAMP  = ')
+     .       read(STRING_HEAD(h)(11:30),*) CCDAMP
         !write(*,'(i3.3,10x,a80,10x,a20)') h,STRING_HEAD(h),APERTURE
          enddo
       print*,'          APERTURE       : ',APERTURE
@@ -3766,6 +3983,7 @@ c     print*,'           APERTURE: ',APERTURE
       if (APERTURE(01:01).eq.' ') APERTURE = APERTURE(02:20)
       if (APERTURE(01:01).eq.' ') APERTURE = APERTURE(02:20)
       print*,'          APERTURE(01:12): ',APERTURE(01:12)
+      print*,'          APERTURE(01:15): ',APERTURE(01:15)
  
       if (APERTURE(01:06).eq.'UVIS  '.or.
      .    APERTURE(01:06).eq.'UVIS1 '.or.
@@ -3814,7 +4032,9 @@ c     print*,'           APERTURE: ',APERTURE
           return
           endif
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB') then
+      if (CCDAMP.eq.'A   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2A-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_r4e(FILE_FLT,pixa,2047,2050,1)
           do j = 0001, 2050
           do i = 0001, 2047
@@ -3823,8 +4043,11 @@ c     print*,'           APERTURE: ',APERTURE
              enddo
           return
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB') then
+      if (CCDAMP.eq.'B   ') then
+      if (APERTURE(01:14).eq.'UVIS1-2K2B-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_r4e(FILE_FLT,pixa,2047,2050,1)
           do j = 0001, 2050
           do i = 0001, 2047
@@ -3833,8 +4056,11 @@ c     print*,'           APERTURE: ',APERTURE
              enddo
           return
           endif
+          endif
  
-      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB') then
+      if (CCDAMP.eq.'C   ') then
+      if (APERTURE(01:14).eq.'UVIS2-2K2C-SUB'.or.
+     .    APERTURE(01:09).eq.'UVIS-QUAD') then
           call readfits_r4e(FILE_FLT,pixa,2047,2050,1)
           do j = 0001, 2050
           do i = 0001, 2047
@@ -3842,6 +4068,7 @@ c     print*,'           APERTURE: ',APERTURE
              enddo
              enddo
           return
+          endif
           endif
  
       if (APERTURE(01:15).eq.'UVIS2-C1K1C-SUB') then
@@ -3853,7 +4080,7 @@ c     print*,'           APERTURE: ',APERTURE
              enddo
           return
           endif
- 
+
       if (APERTURE(01:15).eq.'UVIS2-C512C-SUB') then
           call readfits_r4e(FILE_FLT,pixy,513,512,1)
           do i = 0001, 0513
@@ -3864,11 +4091,41 @@ c     print*,'           APERTURE: ',APERTURE
           return
           endif
  
+      if (APERTURE(01:15).eq.'UVIS2-C512D-SUB') then
+          call readfits_r4e(FILE_FLT,pixy,513,512,1)
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixz_flt(25+i+1*2103,j+1) = pixy(514-i,j)
+             enddo
+             enddo
+          return
+          endif
  
+      if (APERTURE(01:15).eq.'UVIS1-C512A-SUB') then
+          call readfits_r4e(FILE_FLT,pixy,513,512,1)
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixz_flt(25+i+2*2103,j+1) = pixy(i,513-j)
+             enddo
+             enddo
+          return
+          endif
+ 
+      if (APERTURE(01:15).eq.'UVIS1-C512B-SUB') then
+          call readfits_r4e(FILE_FLT,pixy,513,512,1)
+          do i = 0001, 0513
+          do j = 0001, 0512
+             pixz_flt(25+i+3*2103,j+1) = pixy(514-i,513-j)
+             enddo
+             enddo
+          return
+          endif
  
       print*,'sub_wfc3uv_read_flt() not ready for aperture = ',APERTURE
       stop
       end
+
+
  
                                               
 c*********************************************
@@ -5741,6 +5998,30 @@ c-----------------------------------------------
       print*,' '
       stop
       end
- 
- 
+
+
+
+c-----------------------------------------------
+c
+c Returns rval if rval is between rlo and rhi,
+c otherwise it returns the closer endpoint.  It
+c also make sure rval is not a NaN
+c
+      real function rclip(rval,rlo,rhi)
+      implicit none
+
+      real rval
+      real rlo
+      real rhi
+
+      rclip = rval
+      if (rclip.gt.rhi) rclip = rhi
+      if (rclip.lt.rlo) rclip = rlo
+      if (.not.(rclip.lt.rhi).and.
+     .    .not.(rclip.gt.rlo)) rclip = rhi
+
+      return
+      end
+
+
  

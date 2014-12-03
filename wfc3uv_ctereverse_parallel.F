@@ -1499,16 +1499,8 @@ c
  
       real    fcarry
       real    fcarry0
-      integer NRUN
-      common /NRUN_/NRUN
-      data    NRUN/0/
- 
-      NRUN = NRUN + 1
-      if (NRUN.ge.NITs) NRUN = 0
- 
-      fcarry0 = NRUN*1.00/NITs                ! this allows us to start with various amounts of
-                                              ! fractional electrons, just to mix things up
-                                              ! the routine only deals with whole electrons now
+
+      fcarry0 = 0.
  
       if (Ws.gt._WDIM_) stop 'Ws.gt._WDIM_'   ! more traps than we are allowed
  
@@ -5656,4 +5648,13 @@ c-----------------------------------------------
       end
  
  
- 
+c
+c      logical function isnan(r)
+c      implicit none
+c      real r
+c      isnan = .false.
+c      return
+c      end
+c
+
+      
