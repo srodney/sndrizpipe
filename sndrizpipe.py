@@ -163,7 +163,7 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         exposures.print_epochs( explist_all, outfile=epochlistfile,
                                 verbose=verbose, clobber=False,
                                 onlyfilters=None, onlyepochs=None )
-    if len(explist_all) < len(fltlist) :
+    if clobber>1 or len(explist_all) < len(fltlist) :
         print("New flt files detected in %s."%fltdir )
         if not clobber :
             print( "Turn on --clobber to rewrite the epochs list %s"%(epochlistfile))
@@ -773,6 +773,7 @@ def mkparser():
     parser.add_argument('--filters', metavar='X,Y,Z', help='Process only these filters (comma-seperated list)',default='')
     parser.add_argument('--epochs', metavar='X,Y,Z', help='Process only these epochs (comma-seperated list)',default='')
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
+    parser.add_argument('--clobberlevel', type=int, dest='clobber', help='Turn up the clobber level (0-10)', default=1)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
     parser.add_argument('--verboselevel', type=int, dest='verbose', help='Turn up the verbosity (0-10).', default=1 )
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='Turn off verbosity. [default is ON]', default=True )
