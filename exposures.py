@@ -160,8 +160,10 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
                                    exp.mjd) )
 
-    header = '#%9s %5s %3s %3s %6s %5s %7s %8s %8s'%(
-            'rootname','pid','vis','exp','filter','epoch','mjd','exptime','darcsec' )
+    header = '#%9s %5s %3s %3s %6s %5s %7s %8s %8s %6s'%(
+            'rootname','pid','vis','exp','filter','epoch','mjd',
+            'exptime','darcsec','orient' )
+
 
     if outfile:
         print >> fout, header
@@ -309,6 +311,11 @@ class Exposure( object ):
         else :
             self.darcsec = -1
 
+        if len(strlist) > 9 :
+            self.orient = float(strlist[9])
+        else :
+            self.orient = -1
+
         fltdir = outroot + '.flt'
         assert( os.path.isdir( fltdir ) )
 
@@ -358,6 +365,7 @@ class Exposure( object ):
         import pyfits
         import os
         from math import ceil
+        from numpy import nan
 
         self.filename = os.path.basename( filename )
         self.filepath = os.path.abspath( filename )
@@ -421,7 +429,12 @@ class Exposure( object ):
 
         self.rootname = self.header['ROOTNAME']
         self.exptime = self.header['EXPTIME']
-
+        if self.header['PA_V3']<180 :
+            self.orient = self.header['PA_V3'] + 180
+        else :
+            self.orient = self.header['PA_V3'] - 180
+        #if self.orient<0 : self.orient+=360
+        #if self.orient>=360 : self.orient-=360
 
         # 2-digits uniquely identifying this visit and this exposure
         # within this orbit, from the HST filename
@@ -484,6 +497,6 @@ class Exposure( object ):
 
     @property
     def summaryline_short( self ) :
-        return('%9s  %5i %3s %3s %6s    %02i %7.1f %8.2f %8.2f'%(
+        return('%9s  %5i %3s %3s %6s    %02i %7.1f %8.2f %8.2f %6.1f'%(
                 self.rootname, self.pid, self.visit, self.expid, self.filter,
-                self.epoch, self.mjd, self.exptime, self.darcsec ) )
+                self.epoch, self.mjd, self.exptime, self.darcsec, self.orient))
