@@ -43,7 +43,7 @@ def multipipe() :
 
 
 # TODO : write a log file, recording user settings and results
-def runpipe( outroot, onlyfilters=[], onlyepochs=[],
+def runpipe( outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
               # Run all the processing steps
               doall=False,
               # Setup : copy flts into sub-directories
@@ -150,14 +150,18 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
         raise( exceptions.RuntimeError( "There are no flt/flc files in %s !!"%fltdir) )
 
     if os.path.exists( epochlistfile ) :
-        if verbose: print( "%s exists. Adopting existing exposure list and epoch sorting."%epochlistfile )
-        explist_all = exposures.read_explist( epochlistfile )
-        exposures.print_epochs( explist_all, outfile=None,
-                                verbose=verbose, clobber=False,
-                                onlyfilters=None, onlyepochs=None )
+        explist_all = exposures.read_explist(epochlistfile,
+                                             combinebands=combinebands)
+        if verbose :
+            print( "%s exists. Adopting existing exposure list and epoch sorting."%epochlistfile )
+            exposures.print_epochs( explist_all, outfile=None,
+                                    verbose=verbose, clobber=False,
+                                    onlyfilters=None, onlyepochs=None )
     else :
         if verbose: print( "Generating exposure list and epoch sorting from %s/*fl?.fits."%fltdir )
-        explist_all = exposures.get_explist( fltlist, outroot=outroot, targetradec=[ra,dec])
+        explist_all = exposures.get_explist(fltlist, outroot=outroot,
+                                            targetradec=[ra,dec],
+                                            combinebands=combinebands)
         exposures.define_epochs( explist_all, epochspan=epochspan,
                                  mjdmin=mjdmin, mjdmax=mjdmax )
         exposures.print_epochs( explist_all, outfile=epochlistfile,
@@ -171,7 +175,8 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
             print("Updating %s with new flt files detected in %s"%(epochlistfile,fltdir))
             explist_all = exposures.update_epochs( explist_all, fltlist, epochspan=epochspan,
                                                    mjdmin=mjdmin, mjdmax=mjdmax,
-                                                   targetradec=[ra,dec] )
+                                                   targetradec=[ra,dec],
+                                                   combinebands=combinebands)
             exposures.print_epochs( explist_all, outfile=epochlistfile,
                                     verbose=verbose, clobber=clobber,
                                     onlyfilters=None, onlyepochs=None )
@@ -458,8 +463,12 @@ def runpipe( outroot, onlyfilters=[], onlyepochs=[],
                     verbose=verbose,interactive=interactive, clobber=clobber, debug=debug )
 
             # Run tweakback to update the constituent flts
-            tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs,
-                       wcsname=wcsname, verbose=verbose, force=clobber )
+            try:
+                tweakback( outsciFEV, input=fltlistFEV, origwcs=origwcs,
+                           wcsname=wcsname, verbose=verbose, force=clobber )
+            except KeyError as e:
+                import pdb; pdb.set_trace()
+                print("Key Error %s"%e)
             os.chdir(topdir)
               
 
@@ -772,6 +781,8 @@ def mkparser():
     # optional arguments :
     parser.add_argument('--filters', metavar='X,Y,Z', help='Process only these filters (comma-seperated list)',default='')
     parser.add_argument('--epochs', metavar='X,Y,Z', help='Process only these epochs (comma-seperated list)',default='')
+    parser.add_argument('--combinebands', type=str, metavar='X,Y,Z', help='Combine these filters into a single driz product (comma-seperated list)',default=None)
+    parser.add_argument('--combinebandname', type=str, metavar='A', help='Name for combined filter ',default=None)
     parser.add_argument('--clobber', action='store_true', help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--clobberlevel', type=int, dest='clobber', help='Turn up the clobber level (0-10)', default=1)
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='Turn on verbosity. [default is ON]', default=True )
@@ -883,9 +894,19 @@ def main() :
     elif argv.radec is not None :
         ra,dec = [ float(x) for x in argv.radec.split(',') ]
 
+    combinebands=None
+    if argv.combinebands:
+        if not argv.combinebandname:
+            raise exceptions.SyntaxError(
+                "When specifying a set of bands to be combined (using "
+                "--combinebands), you must also specify a name for the "
+                "combination using --combinebandname.  e.g., "
+                "--combinebands F125W,F160W  --combinebandname JH")
+        combinebands = {argv.combinebandname:argv.combinebands}
+
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
-             onlyepochs=(argv.epochs or []),
+             onlyepochs=(argv.epochs or []), combinebands=combinebands,
              doall=argv.doall,
              dosetup=argv.dosetup, dorefim=argv.dorefim,
              dodriz1=argv.dodriz1, doreg=argv.doreg,
