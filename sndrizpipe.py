@@ -113,6 +113,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
         if type(onlyfilters) == str:
             onlyfilters = onlyfilters.lower().split(',')
         onlyfilters = [filt[:5].lower() for filt in onlyfilters]
+        if combinebands:
+            onlyfilters += combinebands.keys()
+
     if type(onlyepochs) in [str, int, float]:
         onlyepochs = [int(ep) for ep in str(onlyepochs).split(',')]
     if tempfilters is not None and len(onlyfilters) != 1:
@@ -242,8 +245,10 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
 
     FEVgrouplist = sorted(np.unique([exp.FEVgroup for exp in explist]))
     FEgrouplist = sorted(np.unique([exp.FEgroup for exp in explist]))
-    filterlist = sorted(np.unique([exp.filter for exp in explist]))
     epochlist = sorted(np.unique([exp.epoch for exp in explist]))
+    filterlist = sorted(np.unique([exp.filter for exp in explist]))
+    if combinebands:
+        filterlist = combinebands.keys()
 
     # STAGE 2 :
     # Construct the WCS reference image
@@ -605,8 +610,13 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
                     continue
                 if epoch == tempepoch:
                     continue
-                explistFE = [exp for exp in explist if
-                             exp.filter == filter and exp.epoch == epoch]
+                if (combinebands is not None) and (filter in combinebands):
+                    explistFE = [exp for exp in explist if
+                                 filter in exp.combinebands.keys() and
+                                 exp.epoch == epoch]
+                else:
+                    explistFE = [exp for exp in explist if
+                                 exp.filter == filter and exp.epoch == epoch]
                 if len(explistFE) == 0:
                     continue
                 epochdirFE = explistFE[0].epochdir
@@ -698,8 +708,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
                     if clean:
                         # delete the sub_sci.fits, b/c it is superseded
                         os.remove(diffim)
-                    print("Created diff image %s, wht map %s, and "
-                          "bpx mask %s" % (diffim_masked, diffwht, diffbpx))
+                    print("Created diff image %s using reg_sci image %s, "
+                          "template %s, wht map %s, and bpx mask %s" % (
+                          diffim_masked, regsci, tempsci, diffwht, diffbpx))
                 os.chdir(topdir)
             pass  # end for epoch in epochlist
         pass  # end for filter in filterlist

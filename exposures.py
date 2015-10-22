@@ -409,9 +409,9 @@ class Exposure( object ):
             self.drzsuffix = 'drc'
 
         self.mjd = round( self.header['EXPSTART'], 2 )
-        try : 
+        try:
             filtername = self.header['FILTER']
-        except : 
+        except:
             filtername = self.header['FILTER1']
             if filtername.startswith('CLEAR') : 
                 filtername = self.header['FILTER2']
