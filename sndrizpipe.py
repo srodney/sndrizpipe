@@ -141,7 +141,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
         doreg = True
         dodriz2 = True
         dodiff = True
-        dostack = True
+        dostack = False
 
     # For single-star registrations, set some useful defaults for the user
     if singlestar:
