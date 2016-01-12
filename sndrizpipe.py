@@ -42,7 +42,7 @@ def multipipe():
     within the current directory
     """
     # TODO : use parallel processing
-    # look for flt/flc files in directories called flt.<rootname>
+    # look for flt/flc/flm files in directories called <rootname>.flt
     fltdirlist = glob.glob("*.flt")
     if not len(fltdirlist):
         exceptions.RuntimeError("There is no <rootname>.flt directory!")
@@ -167,7 +167,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
     fltlist = glob.glob("%s/*fl?.fits" % fltdir)
     if not len(fltlist):
         raise (exceptions.RuntimeError(
-            "There are no flt/flc files in %s !!" % fltdir))
+            "There are no flt/flc/flm files in %s !!" % fltdir))
 
     if os.path.exists(epochlistfile):
         explist_all = exposures.read_explist(epochlistfile,
@@ -898,7 +898,7 @@ def mkparser():
             return argparse.HelpFormatter._split_lines(self, text, width)
 
     parser = argparse.ArgumentParser(
-        description='Run astrodrizzle and tweakreg on a set of flt or flc'
+        description='Run astrodrizzle and tweakreg on a set of flt, flc or flm'
                     'images, building single-epoch drizzled images '
                     'and diff images.',
         formatter_class=SmartFormatter)

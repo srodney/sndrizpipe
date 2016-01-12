@@ -334,10 +334,14 @@ class Exposure( object ):
         assert( os.path.isdir( fltdir ) )
 
         flcfile = os.path.join( fltdir, self.rootname+'_flc.fits')
-        if os.path.isfile( flcfile ) :
+        flmfile = os.path.join( fltdir, self.rootname+'_flm.fits')
+        fltfile = os.path.join( fltdir, self.rootname+'_flt.fits')
+        if os.path.isfile(flcfile):
             filename = flcfile
-        else :
-            filename = flcfile.replace( 'flc.fits','flt.fits' )
+        elif os.path.isfile(flmfile):
+            filename = flmfile
+        else:
+            filename = fltfile
         # assert( os.path.exists(filename))
         self.filename = os.path.basename( filename )
         self.filepath = os.path.abspath( filename )
@@ -349,10 +353,13 @@ class Exposure( object ):
         elif 'flc.fits' in self.filename :
             self.fltsuffix = 'flc'
             self.drzsuffix = 'drc'
+        elif 'flm.fits' in self.filename :
+            self.fltsuffix = 'flm'
+            self.drzsuffix = 'drc'
 
         if self.rootname.startswith('j'):
             self.camera = 'ACS-WFC'
-        elif self.fltsuffix == 'flc' :
+        elif self.fltsuffix == 'flc':
             self.camera = 'WFC3-UVIS'
         elif self.filter[1] != '1':
             self.camera = 'WFC3-UVIS'
@@ -404,7 +411,10 @@ class Exposure( object ):
         if 'flt.fits' in self.filename : 
             self.fltsuffix = 'flt'
             self.drzsuffix = 'drz'
-        elif 'flc.fits' in self.filename : 
+        elif 'flm.fits' in self.filename :
+            self.fltsuffix = 'flm'
+            self.drzsuffix = 'drc'
+        elif 'flc.fits' in self.filename :
             self.fltsuffix = 'flc'
             self.drzsuffix = 'drc'
 

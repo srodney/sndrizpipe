@@ -104,8 +104,12 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'], 
         driz_sep_rot='INDEF',  final_rot='INDEF'  )
 
-    if fltlist[0].find('_flc.fits')>0  : drzsfx = '_drc'
-    else: drzsfx = '_drz'    
+    if fltlist[0].find('_flc.fits') > 0:
+        drzsfx = '_drc'
+    elif fltlist[0].find('_flm.fits') > 0:
+        drzsfx = '_drc'
+    else:
+        drzsfx = '_drz'
     outscifile = outroot+drzsfx+'_sci.fits'
     outwhtfile = outroot+drzsfx+'_wht.fits'
     scrubnans( outscifile ) 
@@ -213,10 +217,14 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         final_bits=drizpar['drizbits'],
         final_ra=ra, final_dec=dec, final_rot=rot,
         final_outnx=naxis1, final_outny=naxis2,
-        final_wht_type=wht_type )
+        final_wht_type=wht_type)
                     
-    if fltlist[0].find('_flc.fits')>0  : drzsfx = '_drc'
-    else: drzsfx = '_drz'    
+    if fltlist[0].find('_flc.fits') > 0:
+        drzsfx = '_drc'
+    elif fltlist[0].find('_flm.fits') > 0:
+        drzsfx = '_drc'
+    else:
+        drzsfx = '_drz'
     outscifile = outroot+drzsfx+'_sci.fits'
     outwhtfile = outroot+drzsfx+'_wht.fits'
 
@@ -242,6 +250,8 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
         for fltfile in fltlist :
             if fltfile.endswith('_flc.fits') :
                 fltsfx = '_flc.fits'
+            elif fltfile.endswith('_flm.fits') :
+                fltsfx = '_flm.fits'
             else :
                 fltsfx = '_flt.fits'
             scifile0 = fltfile.replace(fltsfx,'_single_sci.fits')
@@ -340,7 +350,7 @@ if __name__ == '__main__':
 
     import argparse
 
-    parser = argparse.ArgumentParser(description='Run astrodrizzle on a set of flt or flc images.')
+    parser = argparse.ArgumentParser(description='Run astrodrizzle on a set of flt, flc, or flm images.')
     parser.add_argument('outroot', metavar='outroot',help='Root name for the output _drz products.')
     parser.add_argument('fltlist', metavar='fltlist',nargs = '?',help='List of input flt/flc.fits files. Wildcards are allowed (e.g. "*fl?.fits").', default="*fl?.fits")
     parser.add_argument('--refimage', metavar='refimage', help='WCS reference image. The flt files will be registered to this image. Full path is required.',default='')
