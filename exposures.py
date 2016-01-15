@@ -513,7 +513,7 @@ class Exposure( object ):
         drizzle pass.
         """
         filtername = self.filter
-        if isinstance(self.combinefilterdict, dict):
+        if self.combinefilterdict['method'] is not None:
             if self.combinefilterdict['method'].lower().startswith('driz'):
                 if filtername in self.combinefilterdict['filterlist']:
                     filtername = self.combinefilterdict['name']

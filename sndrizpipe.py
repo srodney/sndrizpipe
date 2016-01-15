@@ -53,7 +53,7 @@ def multipipe():
 # TODO : write a log file, recording user settings and results
 def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             # combine together multiple bands
-            combinefilterdict=None,
+            combinefilterdict={'method':None},
             # Run all the processing steps
             doall=False,
             # Setup : copy flts into sub-directories
@@ -115,7 +115,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         if type(onlyfilters) == str:
             onlyfilters = onlyfilters.lower().split(',')
         onlyfilters = [filt[:5].lower() for filt in onlyfilters]
-        if combinefilterdict['method'].lower().startswith('driz'):
+        if combinefilterdict['method'] == 'driz':
             onlyfilters += combinefilterdict['name']
 
     if type(onlyepochs) in [str, int, float]:
@@ -248,13 +248,14 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     FEgrouplist = sorted(np.unique([exp.FEgroup for exp in explist]))
     epochlist = sorted(np.unique([exp.epoch for exp in explist]))
     filterlist = sorted(np.unique([exp.filter for exp in explist]))
-    combinefiltername = combinefilterlist = combinefiltermethod = None
-    if combinefilterdict:
-        combinefiltername = combinefilterdict['name']
-        combinefiltermethod = combinefilterdict['method']
-        combinefilterlist = combinefilterdict['filterlist']
-        if combinefiltermethod.startswith('driz'):
-            filterlist = combinefiltername
+    if combinefilterdict['method'] is not None:
+        combinefilterdict['diffimfiles'] = {}
+        combinefilterdict['diffwhtfiles'] = {}
+        for epoch in epochlist:
+            combinefilterdict['diffimfiles'][epoch] = {}
+            combinefilterdict['diffwhtfiles'][epoch] = {}
+        if combinefilterdict['method'] == 'driz':
+            filterlist = combinefilterdict['name']
 
     # STAGE 2 :
     # Construct the WCS reference image
@@ -604,13 +605,6 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     # STAGE 6
     # Define a template epoch for each filter and subtract it
     # from the other epochs
-    combinefilterdict['diffimfiles'] = {}
-    combinefilterdict['diffwhtfiles'] = {}
-
-    for epoch in epochlist:
-        combinefilterdict['diffimfiles'][epoch] = {}
-        combinefilterdict['diffwhtfiles'][epoch] = {}
-
     if dodiff:
         if verbose:
             print("sndrizpipe : (6) DIFF : subtracting template images.")
@@ -623,10 +617,10 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                     continue
                 if epoch == tempepoch:
                     continue
-                if ((combinefiltermethod == 'driz') and
-                        (filter in combinefilterlist)):
+                if ((combinefilterdict['method'] == 'driz') and
+                        (filter in combinefilterdict['filterlist'])):
                     explistFE = [exp for exp in explist if
-                                 filter in combinefilterlist and
+                                 filter in combinefilterdict['filterlist'] and
                                  exp.epoch == epoch]
                 else:
                     explistFE = [exp for exp in explist if
@@ -725,8 +719,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                     print("Created diff image %s using reg_sci image %s, "
                           "template %s, wht map %s, and bpx mask %s" % (
                           diffim_masked, regsci, tempsci, diffwht, diffbpx))
-                    if ((combinefiltermethod == 'add') and
-                            (filter in combinefilterlist)):
+                    if ((combinefilterdict['method'] == 'avg') and
+                            (filter in combinefilterdict['filterlist'])):
                         diffimfile = os.path.abspath(diffim_masked)
                         diffwhtfile = os.path.abspath(diffwht)
                         combinefilterdict['diffimfiles'][epoch][filter] = \
@@ -739,20 +733,20 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
 
     # STAGE 6.5
     # add together difference image products from multiple filters
-    if combinefiltermethod == 'add':
+    if combinefilterdict['method'] == 'avg':
         for epoch in epochlist:
             if epoch == tempepoch:
                 continue
             difflist = [combinefilterdict['diffimfiles'][epoch][f]
-                         for f in combinefilterlist]
+                         for f in combinefilterdict['filterlist']]
             whtlist = [combinefilterdict['diffwhtfiles'][epoch][f]
-                       for f in combinefilterlist]
+                       for f in combinefilterdict['filterlist']]
             if len(difflist) == 0:
                 continue
-            outfile = difflist[0].replace(combinefilterlist[0],
-                                          combinefiltername)
-            outwht = whtlist[0].replace(combinefilterlist[0],
-                                        combinefiltername)
+            outfile = difflist[0].replace(combinefilterdict['filterlist'][0],
+                                          combinefilterdict['name'])
+            outwht = whtlist[0].replace(combinefilterdict['filterlist'][0],
+                                        combinefilterdict['name'])
             imarith.imweightedaverage(difflist, whtlist, outfile, outwht,
                                       clobber=clobber, verbose=verbose)
             print("Created composite diff image %s by adding together "
@@ -964,8 +958,9 @@ def mkparser():
     parser.add_argument('--combinefilterlist', type=str, metavar='X,Y,Z',
                         help='Combine these filters into a single image'
                              ' (comma-seperated list)', default=None)
-    parser.add_argument('--combinefiltermethod', type=str, metavar='add or driz',
-                        help='Use simple addition or drizzling to combine '
+    parser.add_argument('--combinefiltermethod', type=str,
+                        choices=['avg','driz'],
+                        help='Use a weighted average or drizzling to combine '
                              'multiple filters together', default=None)
     parser.add_argument('--combinefiltername', type=str, metavar='A',
                         help='Name for combined filter ', default=None)
@@ -1199,7 +1194,7 @@ def main():
     elif argv.radec is not None:
         ra, dec = [float(x) for x in argv.radec.split(',')]
 
-    combinefilterdict = {}
+    combinefilterdict = {'method':None, 'name':None, 'filterlist':None}
     if argv.combinefilterlist:
         if not argv.combinefiltername or not argv.combinefiltermethod:
             raise exceptions.SyntaxError(
