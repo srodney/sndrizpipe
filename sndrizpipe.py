@@ -737,12 +737,14 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         for epoch in epochlist:
             if epoch == tempepoch:
                 continue
-            difflist = [combinefilterdict['diffimfiles'][epoch][f]
-                         for f in combinefilterdict['filterlist']]
-            whtlist = [combinefilterdict['diffwhtfiles'][epoch][f]
-                       for f in combinefilterdict['filterlist']]
-            if len(difflist) == 0:
+            filterkeylist = combinefilterdict['diffimfiles'][epoch].keys()
+            if len(filterkeylist) == 0:
+                print "No suitable diff images for combination."
                 continue
+            difflist = [combinefilterdict['diffimfiles'][epoch][f]
+                         for f in filterkeylist]
+            whtlist = [combinefilterdict['diffwhtfiles'][epoch][f]
+                       for f in filterkeylist]
             outfile = difflist[0].replace(combinefilterdict['filterlist'][0],
                                           combinefilterdict['name'])
             outwht = whtlist[0].replace(combinefilterdict['filterlist'][0],
