@@ -51,7 +51,9 @@ def multipipe():
 
 
 # TODO : write a log file, recording user settings and results
-def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
+def runpipe(outroot, onlyfilters=[], onlyepochs=[],
+            # combine together multiple bands
+            combinefilterdict=None,
             # Run all the processing steps
             doall=False,
             # Setup : copy flts into sub-directories
@@ -113,8 +115,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
         if type(onlyfilters) == str:
             onlyfilters = onlyfilters.lower().split(',')
         onlyfilters = [filt[:5].lower() for filt in onlyfilters]
-        if combinebands:
-            onlyfilters += combinebands.keys()
+        if combinefilterdict['method'].lower().startswith('driz'):
+            onlyfilters += combinefilterdict['name']
 
     if type(onlyepochs) in [str, int, float]:
         onlyepochs = [int(ep) for ep in str(onlyepochs).split(',')]
@@ -170,8 +172,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
             "There are no flt/flc/flm files in %s !!" % fltdir))
 
     if os.path.exists(epochlistfile):
-        explist_all = exposures.read_explist(epochlistfile,
-                                             combinebands=combinebands)
+        explist_all = exposures.read_explist(
+            epochlistfile, combinefilterdict=combinefilterdict)
         if verbose:
             print("%s exists. Adopting existing exposure list and "
                   "epoch sorting." % epochlistfile)
@@ -182,9 +184,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
         if verbose:
             print("Generating exposure list and epoch sorting "
                   "from %s/*fl?.fits." % fltdir)
-        explist_all = exposures.get_explist(fltlist, outroot=outroot,
-                                            targetradec=[ra, dec],
-                                            combinebands=combinebands)
+        explist_all = exposures.get_explist(
+            fltlist, outroot=outroot, targetradec=[ra, dec],
+            combinefilterdict=combinefilterdict)
         exposures.define_epochs(explist_all, epochspan=epochspan,
                                 mjdmin=mjdmin, mjdmax=mjdmax)
         exposures.print_epochs(explist_all, outfile=epochlistfile,
@@ -198,11 +200,10 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
         else:
             print("Updating %s with new flt files detected in %s" % (
                 epochlistfile, fltdir))
-            explist_all = exposures.update_epochs(explist_all, fltlist,
-                                                  epochspan=epochspan,
-                                                  mjdmin=mjdmin, mjdmax=mjdmax,
-                                                  targetradec=[ra, dec],
-                                                  combinebands=combinebands)
+            explist_all = exposures.update_epochs(
+                explist_all, fltlist, epochspan=epochspan,
+                mjdmin=mjdmin, mjdmax=mjdmax, targetradec=[ra, dec],
+                combinefilterdict=combinefilterdict)
             exposures.print_epochs(explist_all, outfile=epochlistfile,
                                    verbose=verbose, clobber=clobber,
                                    onlyfilters=None, onlyepochs=None)
@@ -247,8 +248,13 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
     FEgrouplist = sorted(np.unique([exp.FEgroup for exp in explist]))
     epochlist = sorted(np.unique([exp.epoch for exp in explist]))
     filterlist = sorted(np.unique([exp.filter for exp in explist]))
-    if combinebands:
-        filterlist = combinebands.keys()
+    combinefiltername = combinefilterlist = combinefiltermethod = None
+    if combinefilterdict:
+        combinefiltername = combinefilterdict['name']
+        combinefiltermethod = combinefilterdict['method']
+        combinefilterlist = combinefilterdict['filterlist']
+        if combinefiltermethod.startswith('driz'):
+            filterlist = combinefiltername
 
     # STAGE 2 :
     # Construct the WCS reference image
@@ -598,6 +604,13 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
     # STAGE 6
     # Define a template epoch for each filter and subtract it
     # from the other epochs
+    combinefilterdict['diffimfiles'] = {}
+    combinefilterdict['diffwhtfiles'] = {}
+
+    for epoch in epochlist:
+        combinefilterdict['diffimfiles'][epoch] = {}
+        combinefilterdict['diffwhtfiles'][epoch] = {}
+
     if dodiff:
         if verbose:
             print("sndrizpipe : (6) DIFF : subtracting template images.")
@@ -610,9 +623,10 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
                     continue
                 if epoch == tempepoch:
                     continue
-                if (combinebands is not None) and (filter in combinebands):
+                if ((combinefiltermethod == 'driz') and
+                        (filter in combinefilterlist)):
                     explistFE = [exp for exp in explist if
-                                 filter in exp.combinebands.keys() and
+                                 filter in combinefilterlist and
                                  exp.epoch == epoch]
                 else:
                     explistFE = [exp for exp in explist if
@@ -711,9 +725,39 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[], combinebands=None,
                     print("Created diff image %s using reg_sci image %s, "
                           "template %s, wht map %s, and bpx mask %s" % (
                           diffim_masked, regsci, tempsci, diffwht, diffbpx))
+                    if ((combinefiltermethod == 'add') and
+                            (filter in combinefilterlist)):
+                        diffimfile = os.path.abspath(diffim_masked)
+                        diffwhtfile = os.path.abspath(diffwht)
+                        combinefilterdict['diffimfiles'][epoch][filter] = \
+                            diffimfile
+                        combinefilterdict['diffwhtfiles'][epoch][filter] = \
+                            diffwhtfile
                 os.chdir(topdir)
             pass  # end for epoch in epochlist
         pass  # end for filter in filterlist
+
+    # STAGE 6.5
+    # add together difference image products from multiple filters
+    if combinefiltermethod == 'add':
+        for epoch in epochlist:
+            if epoch == tempepoch:
+                continue
+            difflist = [combinefilterdict['diffimfiles'][epoch][f]
+                         for f in combinefilterlist]
+            whtlist = [combinefilterdict['diffwhtfiles'][epoch][f]
+                       for f in combinefilterlist]
+            if len(difflist) == 0:
+                continue
+            outfile = difflist[0].replace(combinefilterlist[0],
+                                          combinefiltername)
+            outwht = whtlist[0].replace(combinefilterlist[0],
+                                        combinefiltername)
+            imarith.imweightedaverage(difflist, whtlist, outfile, outwht,
+                                      clobber=clobber, verbose=verbose)
+            print("Created composite diff image %s by adding together "
+                  "filters %s in epoch %02i" % (
+                  outfile, ','.join(combinefilterdict['filterlist']), epoch))
 
     # STAGE 7
     # Drizzle together all specified non-template epochs into a single stack
@@ -916,11 +960,16 @@ def mkparser():
     parser.add_argument('--epochs', metavar='X,Y,Z',
                         help='Process only these epochs '
                         '(comma-separated list)', default='')
-    parser.add_argument('--combinebands', type=str, metavar='X,Y,Z',
-                        help='Combine these filters into a single driz product'
+
+    parser.add_argument('--combinefilterlist', type=str, metavar='X,Y,Z',
+                        help='Combine these filters into a single image'
                              ' (comma-seperated list)', default=None)
-    parser.add_argument('--combinebandname', type=str, metavar='A',
+    parser.add_argument('--combinefiltermethod', type=str, metavar='add or driz',
+                        help='Use simple addition or drizzling to combine '
+                             'multiple filters together', default=None)
+    parser.add_argument('--combinefiltername', type=str, metavar='A',
                         help='Name for combined filter ', default=None)
+
     parser.add_argument('--clobber', action='store_true',
                         help='Turn on clobber mode. [False]', default=False)
     parser.add_argument('--clobberlevel', type=int, dest='clobber',
@@ -1150,23 +1199,29 @@ def main():
     elif argv.radec is not None:
         ra, dec = [float(x) for x in argv.radec.split(',')]
 
-    combinebands = None
-    if argv.combinebands:
-        if not argv.combinebandname:
+    combinefilterdict = {}
+    if argv.combinefilterlist:
+        if not argv.combinefiltername or not argv.combinefiltermethod:
             raise exceptions.SyntaxError(
                 "When specifying a set of bands to be combined (using "
-                "--combinebands), you must also specify a name for the "
-                "combination using --combinebandname.  e.g., "
-                "--combinebands F125W,F160W  --combinebandname JH")
-        combinebands = {argv.combinebandname: argv.combinebands}
+                "--combinefilterlist), you must also specify "
+                "a name for the combination using --combinebandname and "
+                "a method (driz or add) e.g., "
+                "--combinefilterlist F125W,F160W  --combinefiltername JH "
+                "--combinefiltermethod add")
+        combinefilterdict['name'] = argv.combinefiltername
+        combinefilterdict['filterlist'] = argv.combinefilterlist.lower().split(',')
+        combinefilterdict['method'] = argv.combinefiltermethod.lower()
 
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
-            onlyepochs=(argv.epochs or []), combinebands=combinebands,
+            onlyepochs=(argv.epochs or []),
+            combinefilterdict=combinefilterdict,
             doall=argv.doall,
             dosetup=argv.dosetup, dorefim=argv.dorefim,
             dodriz1=argv.dodriz1, doreg=argv.doreg,
-            dodriz2=argv.dodriz2, dodiff=argv.dodiff, dostack=argv.dostack,
+            dodriz2=argv.dodriz2, dodiff=argv.dodiff,
+            dostack=argv.dostack,
             drizcr=argv.drizcr, drizcrsnr=argv.drizcrsnr,
             intravisitreg=argv.intravisitreg,
             refim=argv.refimage, refepoch=argv.refepoch,

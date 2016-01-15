@@ -206,3 +206,115 @@ def combine_ivm_maps( im1, im2, outfile, clobber=False, verbose=False):
     pyfits.writeto( outfile, ivm12out, header=im1head,clobber=clobber,
                     output_verify='fix')
     return( outfile )
+
+
+def imaverage( imagelist, outfile,
+               clobber=False, verbose=False):
+    """
+     construct a simple average of all images in the list.
+     Assumes all input images have identical dimensions
+     Returns name of outfile
+    """
+    import os
+    import pyfits
+    from numpy import where, ones, zeros, array, ndarray, nan_to_num,float32
+    import exceptions
+
+    if os.path.exists(outfile)  :
+        if clobber :
+            os.unlink( outfile )
+        else :
+            print( "%s exists. Not clobbering."%outfile )
+            return( outfile )
+
+    # make empty arrays for components of the weighted average
+    naxis1 = pyfits.getval( imagelist[0], 'NAXIS1')
+    naxis2 = pyfits.getval( imagelist[0], 'NAXIS2')
+    sumarray = zeros( [naxis2,naxis1], dtype=float32 )
+    ncombinearray = zeros( [naxis2,naxis1], dtype=float32 )
+
+    # construct the weighted average and update header keywords
+    outhdr = pyfits.getheader( imagelist[0] )
+    i = 1
+    # import pdb; pdb.set_trace()
+    for imfile in imagelist :
+        imdat = pyfits.getdata( imfile )
+        sumarray +=  imdat
+        ncombinearray += where( imdat != 0 , ones(imdat.shape), zeros(imdat.shape) )
+        outhdr.update("SRCIM%02i"%i,imfile,"source image %i, used in average "%i )
+        i+= 1
+    outscidat = where( ncombinearray > 0 , sumarray/ncombinearray, zeros(sumarray.shape) )
+
+    outdir = os.path.dirname( outfile )
+    if outdir :
+        if not os.path.isdir(outdir):
+            os.makedirs( outdir )
+    pyfits.writeto( outfile, outscidat, header=outhdr )
+
+    return( outfile )
+
+def imweightedaverage( imagelist, whtlist, outfile, outwht,
+                     clobber=False, verbose=False):
+    """
+     construct a weighted average :
+
+     (weight1*image1 + weight2*image2 + ...) / (weight1+weight2+...)
+
+     And a composite weight map :
+       (weight1 + weight2 + ...) / Nweight
+
+     Mean image is written to outfile.
+     Assumes all input images have identical dimensions
+     Returns name of outfile and whtfile
+    """
+    import os
+    import pyfits
+    from numpy import where, ones, zeros, array, ndarray, nan_to_num,float32
+    import exceptions
+
+    if os.path.exists(outfile)  :
+        if clobber :
+            os.unlink( outfile )
+        else :
+            print( "%s exists. Not clobbering."%outfile )
+            return( outfile, outwht )
+
+    if os.path.exists(outwht)  :
+        if clobber :
+            os.unlink( outwht )
+        else :
+            print( "%s exists. Not clobbering."%outwht )
+            return( outfile, outwht )
+
+    # make empty arrays for components of the weighted average
+    naxis1 = pyfits.getval( imagelist[0], 'NAXIS1')
+    naxis2 = pyfits.getval( imagelist[0], 'NAXIS2')
+    sumarray = zeros( [naxis2,naxis1], dtype=float32 )
+    ncombinearray = zeros( [naxis2,naxis1], dtype=float32 )
+    whtarray = ones( [naxis2,naxis1], dtype=float32 )
+
+    # construct the weighted average and update header keywords
+    outhdr = pyfits.getheader( imagelist[0] )
+    i = 1
+    # import pdb; pdb.set_trace()
+    for imfile, whtfile in zip( imagelist, whtlist ) :
+        imdat = pyfits.getdata( imfile )
+        whtdat = pyfits.getdata( whtfile )
+        sumarray +=  whtdat * imdat
+        whtarray += whtdat
+        ncombinearray += where( whtdat > 0 , ones(whtdat.shape), zeros(whtdat.shape) )
+        outhdr.update("SRCIM%02i"%i,imfile,"source image %i, used in weighted average "%i )
+        i+= 1
+    # outscidat = nan_to_num( sumarray / whtarray )
+    # outscidat = sumarray / whtarray
+    outscidat = where( ncombinearray > 0 , sumarray / whtarray, zeros(sumarray.shape) )
+    outwhtdat = where( ncombinearray > 0 , whtarray/ncombinearray, zeros(whtarray.shape) )
+
+    outdir = os.path.dirname( outfile )
+    if outdir :
+        if not os.path.isdir(outdir):
+            os.makedirs( outdir )
+    pyfits.writeto( outfile, outscidat, header=outhdr )
+    pyfits.writeto( outwht,  outwhtdat, header=outhdr )
+
+    return( outfile, outwht )

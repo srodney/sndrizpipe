@@ -5,13 +5,13 @@
 # and drizzling.
 
 def get_explist( fltlist='*fl?.fits', outroot='TARGNAME',
-                 targetradec=[None,None], combinebands=None ):
+                 targetradec=[None,None], combinefilterdict=None ):
     """ make a list of Exposure objects for each flt file"""
     from stsci import tools
     if type(fltlist)==str :
         fltlist=tools.parseinput.parseinput(fltlist)[0]
     return( [ Exposure( fltfile, outroot=outroot, targetradec=targetradec,
-                        combinebands=combinebands)
+                        combinefilterdict=combinefilterdict)
               for fltfile in fltlist ] )
 
 
@@ -56,7 +56,7 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
     return(explist)
 
 def update_epochs( explist, fltlist, epochspan=5, mjdmin=0, mjdmax=0,
-                   targetradec=[None,None], combinebands=None):
+                   targetradec=[None,None], combinefilterdict=None):
     """
     Update an existing epoch-sorted exposure list with new flts from fltlist.
     The new flts are not allowed to seed new epochs, unless appending to the
@@ -83,7 +83,7 @@ def update_epochs( explist, fltlist, epochspan=5, mjdmin=0, mjdmax=0,
             continue
         newfltlist.append( fltfile )
     newexplist = [ Exposure(fltfile,outroot=outroot,targetradec=targetradec,
-                            combinebands=combinebands)
+                            combinefilterdict=combinefilterdict)
                    for fltfile in newfltlist ]
 
     # Sort the new exposures list by mjd
@@ -125,7 +125,8 @@ def update_epochs( explist, fltlist, epochspan=5, mjdmin=0, mjdmax=0,
     return(explist)
 
 
-def read_explist(epochlistfile, outroot=None, combinebands=None):
+def read_explist(epochlistfile, outroot=None,
+                 combinefilterdict=None):
     """Read the exposure list and epoch sorting scheme from epochlistfile,
     generating a new list of Exposures and return that explist.
     """
@@ -139,7 +140,7 @@ def read_explist(epochlistfile, outroot=None, combinebands=None):
         line = line.strip()
         if line.startswith('#') : continue
         if len(line)==0 : continue
-        explist.append(Exposure(line, outroot, combinebands=combinebands))
+        explist.append(Exposure(line, outroot, combinefilterdict=combinefilterdict))
     # Sort the exposure list by epoch, filter, visit, and MJD
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit, exp.mjd ) )
     return(explist)
@@ -280,30 +281,30 @@ class Exposure( object ):
     """
 
     def __init__(self, initstr, outroot='TARGNAME',
-                 targetradec=[None, None], combinebands=None):
+                 targetradec=[None, None], combinefilterdict=None):
         """ Initialize an Exposure object from a string or flt file.
 
-        :param combinebands: when combining multiple filters together
+        :param combinefilterdict: when combining multiple filters together
            in a single drizzle product, provide a dict object with the
-           'pseudo-filter' name as the key and a list of filter names as
-           the values.  e.g., {'JH':['F125W','F160W']}
+           'pseudo-filter' name and a list of filter names
+             e.g., {'name':'JH', 'filterlist':['F125W','F160W']}
         """
         if initstr.endswith('.fits') :
             self.initFromFile(initstr, outroot=outroot,
                               targetradec=targetradec,
-                              combinebands=combinebands)
+                              combinefilterdict=combinefilterdict)
         else :
-            self.initFromStr(initstr, outroot, combinebands=combinebands)
+            self.initFromStr(initstr, outroot, combinefilterdict=combinefilterdict)
 
 
-    def initFromStr(self, fltstr, outroot, combinebands=None):
+    def initFromStr(self, fltstr, outroot, combinefilterdict=None):
         """ Initialize an Exposure object from a string. Specifically,
         a single row from the _epochs.txt file. e.g. :
              ich319ngq  13575  19  ng  f110w    01 56686.1  [exptime]
         """
         import os
 
-        self.combinebands = combinebands
+        self.combinefilterdict = combinefilterdict
 
         strlist = fltstr.split()
         self.rootname = strlist[0]
@@ -381,7 +382,7 @@ class Exposure( object ):
 
 
     def initFromFile(self, filename, outroot='TARGNAME',
-                     targetradec=[None,None], combinebands=None):
+                     targetradec=[None,None], combinefilterdict=None):
         """ Initialize an Exposure object from an flt.fits file.
         """
         import pyfits
@@ -389,7 +390,7 @@ class Exposure( object ):
         from math import ceil
         from numpy import nan
 
-        self.combinebands = combinebands
+        self.combinefilterdict = combinefilterdict
         self.filename = os.path.basename( filename )
         self.filepath = os.path.abspath( filename )
 
@@ -512,11 +513,11 @@ class Exposure( object ):
         drizzle pass.
         """
         filtername = self.filter
-        if isinstance(self.combinebands, dict):
-            for key in self.combinebands:
-                if filtername in self.combinebands[key]:
-                    filtername = key
-        return '%s_e%02i'%(filtername, self.epoch)
+        if isinstance(self.combinefilterdict, dict):
+            if self.combinefilterdict['method'].lower().startswith('driz'):
+                if filtername in self.combinefilterdict['filterlist']:
+                    filtername = self.combinefilterdict['name']
+        return '%s_e%02i' % (filtername, self.epoch)
            
     @property
     def summaryline( self ) :
