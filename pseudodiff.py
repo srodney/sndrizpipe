@@ -119,7 +119,8 @@ def camfiltername(imfile):
     return( filtername.upper() )
 
 def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
-                      filtdir='HSTFILTERS', verbose=True, clobber=False ):
+                      scalefactor=1, filtdir='HSTFILTERS', verbose=True,
+                      clobber=False ):
     """ Combine and/or scale imfile1 (and imfile2) to match the
     filter transmission function for targetfilter (e.g. for making a
     template image for F814W from two images in F775W and F850LP).
@@ -148,8 +149,8 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
         if verbose :
             print('Scaling %s to match %s'%(sourcefilter1,targetfilter))
 
-    scalefactor = computeFilterScaling( targetfilter, sourcefilter1,
-                                        source2=sourcefilter2, filtdir=filtdir)
+    scalefactor = scalefactor * computeFilterScaling(
+        targetfilter, sourcefilter1, source2=sourcefilter2, filtdir=filtdir)
 
     if imfile2 :
         imdat = imarith.imsum( imfile1, imfile2 )
@@ -206,7 +207,8 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
 
 
 def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
-                    tempfilter2=None, tempepoch2=None, filtdir='HSTFILTERS',
+                    tempfilter2=None, tempepoch2=None, scalefactor=1,
+                    filtdir='HSTFILTERS',
                     clean=True, verbose=True, clobber=False ):
     """ Primary function for making pseudo-filter diff images :
     * make a scaled template image, scaling the template filter to match the target filter
@@ -272,7 +274,7 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     else :
         tempsci, tempwht, tempbpx = mkscaledtemplate(
             targetcamfilter, tempfile, imfile2=tempfile2, outfile=outfile,
-            filtdir=filtdir, verbose=verbose, clobber=clobber )
+            scalefactor=scalefactor, filtdir=filtdir, verbose=verbose, clobber=clobber)
 
     subsci = '%s_%s_e%02i-e%02i_sub_sci.fits'%(targname, targfilter, targepoch, tempepoch)
     subsci = os.path.join( targdir, subsci )
@@ -313,6 +315,7 @@ def main():
     parser.add_argument('targetepoch', type=int, help="Epoch of the target image" )
     parser.add_argument('tempfilter', type=str, help="Filter of the template image, to be scaled." )
     parser.add_argument('tempfilter2', nargs='?', type=str, help="Optional second template filter, to be combined with the first and scaled." )
+    parser.add_argument('--scalefactor', metavar=1, type=float, default=1, help="Specify an additional scale factor to apply to the template image after scaling input template image(s) to have total integrated filter transmission equal to the search epoch." )
     parser.add_argument('--tempepoch', metavar=0, type=int, default=0, help="Epoch of the template image" )
     parser.add_argument('--tempepoch2', metavar=0, type=int, default=None, help="Epoch of the 2nd template image. If not provided, we assume it is the same as the first." )
     parser.add_argument('--filtdir', metavar='HSTFILTERS', type=str,
@@ -331,6 +334,7 @@ def main():
     doScaleSubMask( argv.name, argv.targetfilter.lower()[:5], argv.targetepoch,
                     argv.tempfilter.lower()[:5], argv.tempepoch,
                     tempfilter2=tempfilter2, tempepoch2=argv.tempepoch2,
+                    scalefactor=argv.scalefactor,
                     filtdir=argv.filtdir, clean=True, verbose=argv.verbose, clobber=argv.clobber)
 
 
