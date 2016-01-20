@@ -198,10 +198,12 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
     if os.path.isfile( inbpx2 ) :
         outbpx = badpix.unionmask( inbpx1, inbpx2, outbpx,
                                    clobber=clobber, verbose=verbose )
+        assert os.path.isfile( outbpx ), "Scaled badpix image %s not created."%outbpx
+    else:
+        outbpx = None
 
     assert os.path.isfile( outfile ), "Scaled template %s not created."%outfile
     assert os.path.isfile( outwht ), "Scaled weight image %s not created."%outwht
-    assert os.path.isfile( outbpx ), "Scaled badpix image %s not created."%outbpx
 
     return( outfile, outwht, outbpx)
 
@@ -231,7 +233,7 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     targbpx = targsci.replace( '_sci.fits','_bpx.fits')
     assert os.path.isfile( targsci )
     assert os.path.isfile( targwht )
-    assert os.path.isfile( targbpx )
+    # assert os.path.isfile( targbpx )
 
     hdr = pyfits.getheader( targsci )
     if 'CAMERA' in hdr :
@@ -285,14 +287,20 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     diffwht = imarith.combine_ivm_maps( targwht, tempwht,
                                        diffim.replace('sci.fits','wht.fits'),
                                        clobber=clobber, verbose=verbose )
-    diffbpx = badpix.unionmask( tempbpx, targbpx,
-                         diffim.replace('sci.fits','bpx.fits'),
-                         clobber=clobber, verbose=verbose)
-    diffim_masked = badpix.applymask( diffim, diffbpx,
-                                     clobber=clobber, verbose=verbose)
-    if clean :
-        # delete the sub_sci.fits, b/c it is superseded
-        os.remove( diffim )
+
+    if os.path.exists(targbpx):
+        diffbpx = badpix.unionmask( tempbpx, targbpx,
+                                    diffim.replace('sci.fits','bpx.fits'),
+                                    clobber=clobber, verbose=verbose)
+        diffim_masked = badpix.applymask( diffim, diffbpx,
+                                          clobber=clobber, verbose=verbose)
+        if clean:
+            # delete the sub_sci.fits, b/c it is superseded
+            os.remove( diffim )
+    else:
+        diffim_masked = diffim.replace('sub_sci.fits', 'sub_masked.fits')
+        os.rename(diffim, diffim_masked)
+        diffbpx = None
     if verbose :
         print("Created diff image %s, wht map %s, and bpx mask %s"%(
             diffim_masked, diffwht, diffbpx ) )
