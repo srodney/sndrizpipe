@@ -112,7 +112,17 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         drzsfx = '_drz'
     outscifile = outroot+drzsfx+'_sci.fits'
     outwhtfile = outroot+drzsfx+'_wht.fits'
-    scrubnans( outscifile ) 
+
+    if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
+        if os.path.isfile(outscifile.replace('drc','drz')):
+            os.rename(outscifile.replace('drc','drz'), outscifile)
+        if os.path.isfile(outwhtfile.replace('drc','drz')):
+            os.rename(outwhtfile.replace('drc','drz'), outwhtfile)
+
+    if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
+        raise exceptions.RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
+
+    scrubnans( outscifile )
     scrubnans( outwhtfile )
 
     if clean :
@@ -228,7 +238,13 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     outscifile = outroot+drzsfx+'_sci.fits'
     outwhtfile = outroot+drzsfx+'_wht.fits'
 
-    if (not os.path.isfile( outscifile )) or  (not os.path.isfile( outwhtfile ) ) :
+    if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
+        if os.path.isfile(outscifile.replace('drc','drz')):
+            os.rename(outscifile.replace('drc','drz'), outscifile)
+        if os.path.isfile(outwhtfile.replace('drc','drz')):
+            os.rename(outwhtfile.replace('drc','drz'), outwhtfile)
+
+    if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
         raise exceptions.RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
 
     scrubnans( outscifile ) 
