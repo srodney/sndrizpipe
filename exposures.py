@@ -35,21 +35,32 @@ def define_epochs( explist, epochspan=5, mjdmin=0, mjdmax=0 ):
 
     thisepochmjd0 = mjdlist.min()
     thisepoch = 1
+    ithisvislist = []
     for imjd in mjdlist.argsort() :
+        if imjd in ithisvislist:
+            continue
         thismjd = mjdlist[imjd]
         exp = explist[imjd]
-        for ithisvis in np.where( pidvisitlist == pidvisitlist[imjd] )[0] :
-            if exp.epoch == -1 or not exp.ontarget :
-                epochlist[ ithisvis ] = -1
-                explist[ ithisvis ].epoch = -1
-            else :
-                if (mjdmin>0) and (thismjd < mjdmin) : thisepoch=0
-                elif (mjdmax>0) and (thismjd > mjdmax) : thisepoch=0
-                elif thismjd > thisepochmjd0+epochspan :
-                    thisepoch += 1
-                    thisepochmjd0 = thismjd
-                epochlist[ ithisvis ] = thisepoch
-                explist[ ithisvis ].epoch = thisepoch
+        ithisvislist = np.where(pidvisitlist == pidvisitlist[imjd])[0]
+        mjdthisvislist = mjdlist[ithisvislist]
+        mjdminthisvis = np.min(mjdthisvislist)
+        mjdmaxthisvis = np.max(mjdthisvislist)
+        mjdavgthisvis = np.mean(mjdthisvislist)
+
+        if exp.epoch == -1 or not exp.ontarget :
+            applyepoch = -1
+        else:
+            if (mjdmin > 0) and (mjdmaxthisvis < mjdmin):
+                thisepoch = 0
+            elif (mjdmax>0) and (mjdminthisvis > mjdmax):
+                thisepoch = 0
+            elif mjdminthisvis > thisepochmjd0 + epochspan:
+                thisepoch += 1
+                thisepochmjd0 = mjdavgthisvis
+            applyepoch = thisepoch
+        for ithisvis in ithisvislist:
+            epochlist[ithisvis] = applyepoch
+            explist[ithisvis].epoch = applyepoch
     # Sort the exposure list by epoch, then filter, then visit
     explist.sort( key=lambda exp: (exp.epoch, exp.filter, exp.pidvisit,
                                    exp.mjd) )
