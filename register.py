@@ -318,6 +318,7 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     if len(sciextlist)>0:
         imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=(sciextlist[0],1) )
     else:
+        sciextlist = ['PRIMARY']
         imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=None )
     xref, yref = imwcs.wcs_sky2pix( ra, dec , 1)
 

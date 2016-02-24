@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 """
 S.Rodney 2014.02.26
 
@@ -318,3 +319,50 @@ def imweightedaverage( imagelist, whtlist, outfile, outwht,
     pyfits.writeto( outwht,  outwhtdat, header=outhdr )
 
     return( outfile, outwht )
+
+
+def mkparser():
+    import argparse
+
+    class SmartFormatter(argparse.HelpFormatter):
+        def _split_lines(self, text, width):
+            # this is the RawTextHelpFormatter._split_lines
+            if text.startswith('R|'):
+                return text[2:].splitlines()
+            return argparse.HelpFormatter._split_lines(self, text, width)
+
+    parser = argparse.ArgumentParser(
+        description='Combine a list of images. Assumes they are the same '
+                    'size, same pixel scale, and already registered.',
+        formatter_class=SmartFormatter)
+
+    # Required positional argument
+    parser.add_argument('outfile',
+                        help='Output filename for the combined image.')
+
+    # optional arguments :
+    parser.add_argument('--combinetype', type=str,
+                        choices=['mean', 'sum', 'median'], default='mean',
+                        help='Combination method.')
+    parser.add_argument('--clobber', action='store_true',
+                        help='Turn on clobber mode. [False]', default=False)
+    parser.add_argument('--verbose', dest='verbose', action='store_true',
+                        help='Turn on verbosity. [default is OFF]',
+                        default=False)
+    parser.add_argument('--imagelist', nargs='+',
+                        help='List of image files to combine.')
+
+    return parser
+
+def main():
+    parser = mkparser()
+    argv = parser.parse_args()
+
+    if argv.combinetype == 'mean':
+        outfile = imaverage(argv.imagelist, argv.outfile, clobber=argv.clobber,
+                            verbose=argv.verbose)
+    print('created %s'%outfile)
+
+
+if __name__ == "__main__":
+    main()
