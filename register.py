@@ -190,15 +190,15 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
 
 def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
                    computesig=False, refim=None,
-                   threshmin=0.5, peakmin=None, peakmax=None, searchrad=10.0,
+                   threshmin=0.5, peakmin=None, peakmax=None, searchrad=5.0,
                    nsigma=1.5, fluxmin=None, fluxmax=None,
                    verbose=True, clobber=True ):
     """ Update the WCS of imfile so that it matches the WCS of the refimfile,
     using a single star to define the necessary shift.
     If xy or xyref are provided, then assume the star is located within
-    searchrad pixels of that position in the imfile or the refimfile, respectively.
-    If either of those pixel coordinates are not provided, then use the
-    brightest star in the image.
+    searchrad arcsec of that position in the imfile or the refimfile,
+    respectively. If either of those pixel coordinates are not provided, then
+    use the brightest star in the image.
     """
     # noinspection PyUnresolvedReferences
     from numpy import deg2rad, sqrt, cos, where, median
@@ -314,10 +314,11 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     # locate the appropriate extensions for updating
     hdulist = pyfits.open( imfile )
     sciextlist = [ hdu.name for hdu in hdulist if 'WCSAXES' in hdu.header ]
-    assert(len(sciextlist)>0)
-
-    # convert the target position from ra,dec to x,y
-    imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=(sciextlist[0],1) )
+    # convert the target position from ra,de to x,y
+    if len(sciextlist)>0:
+        imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=(sciextlist[0],1) )
+    else:
+        imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=None )
     xref, yref = imwcs.wcs_sky2pix( ra, dec , 1)
 
     # If the new centroid position differs substantially from the original
