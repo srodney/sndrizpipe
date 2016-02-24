@@ -504,7 +504,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 # Special case for handling standard star images:
                 wcsname = register.SingleStarReg(
                     outsciFEV, ra, dec, refim=None, threshmin=threshold,
-                    peakmin=peakmin, peakmax=peakmax,
+                    peakmin=peakmin, peakmax=peakmax, searchrad=searchrad,
                     wcsname='SINGLESTAR:%.6f,%.6f' % (ra, dec),
                     verbose=verbose)
 
