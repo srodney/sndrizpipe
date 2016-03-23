@@ -116,19 +116,16 @@ def trimcat( incat, ra, dec, radius, outcatfile=None):
     from astropy.io import ascii
     from astropy.coordinates import ICRS
     from astropy import units as u
-
+    from numpy import cos, where
     if isinstance( incat, str) :
         incat = ascii.read( incat )
     racat = incat['RA']
     deccat = incat['DEC']
 
-    ctr = ICRS( ra=float(ra),dec=float(dec), unit=(u.degree, u.degree))
-    idrop = []
-    for i in range(len(racat)):
-        src = ICRS( ra=racat[i],dec=deccat[i], unit=(u.degree, u.degree))
-        darcsec = ctr.separation( src ).arcsec
-        if darcsec > radius : idrop.append( i )
-    incat.remove_rows( idrop )
+    dec_rad = 0.0174533 * dec
+    darcsec = (cos(dec_rad) * (ra - racat)**2 + (dec - deccat)**2) * 3600
+    ifar = where(darcsec > radius)[0]
+    incat.remove_rows( ifar )
     if outcatfile :
         incat.write( outcatfile, format='ascii.commented_header')
     return( incat )
