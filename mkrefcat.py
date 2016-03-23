@@ -116,14 +116,14 @@ def trimcat( incat, ra, dec, radius, outcatfile=None):
     from astropy.io import ascii
     from astropy.coordinates import ICRS
     from astropy import units as u
-    from numpy import cos, where
+    from numpy import cos, where, sqrt
     if isinstance( incat, str) :
         incat = ascii.read( incat )
     racat = incat['RA']
     deccat = incat['DEC']
 
     dec_rad = 0.0174533 * dec
-    darcsec = (cos(dec_rad) * (ra - racat)**2 + (dec - deccat)**2) * 3600
+    darcsec = sqrt((cos(dec_rad) * (ra - racat)**2 + (dec - deccat)**2)) * 3600
     ifar = where(darcsec > radius)[0]
     incat.remove_rows( ifar )
     if outcatfile :
