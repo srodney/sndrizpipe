@@ -361,7 +361,7 @@ def main():
     if argv.combinetype == 'mean':
         outfile = imaverage(argv.imagelist, argv.outfile, clobber=argv.clobber,
                             verbose=argv.verbose)
-    print('created %s'%outfile)
+        print('created %s'%outfile)
 
 
 if __name__ == "__main__":
