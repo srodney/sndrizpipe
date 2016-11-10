@@ -101,8 +101,8 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
         combine_type='iminmed', driz_cr_snr=driz_cr_snr,
         driz_sep_bits=drizpar['drizbits'], final_bits=drizpar['drizbits'], 
         driz_sep_pixfrac=drizpar['pixfrac'], final_pixfrac=drizpar['pixfrac'], 
-        driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'], 
-        driz_sep_rot='INDEF',  final_rot='INDEF'  )
+        driz_sep_scale=drizpar['pixscale'], final_scale=drizpar['pixscale'])
+        # driz_sep_rot='INDEF',  final_rot='INDEF'  )
 
     if fltlist[0].find('_flc.fits') > 0:
         drzsfx = '_drc'
