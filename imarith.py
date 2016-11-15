@@ -236,14 +236,12 @@ def imaverage( imagelist, outfile,
 
     # construct the weighted average and update header keywords
     outhdr = pyfits.getheader( imagelist[0] )
-    i = 1
-    # import pdb; pdb.set_trace()
-    for imfile in imagelist :
-        imdat = pyfits.getdata( imfile )
-        sumarray +=  imdat
+    for imfilenum, imfile in zip(range(1, len(imagelist) + 1, imagelist)):
+        imdat = pyfits.getdata(imfile)
+        sumarray += imdat
         ncombinearray += where( imdat != 0 , ones(imdat.shape), zeros(imdat.shape) )
-        outhdr.update("SRCIM%02i"%i,imfile,"source image %i, used in average "%i )
-        i+= 1
+        outhdr.update({"SRCIM%02i" % imfilenum: (
+            imfile, "source im %i, used in avg" % imfilenum)})
     outscidat = where( ncombinearray > 0 , sumarray/ncombinearray, zeros(sumarray.shape) )
 
     outdir = os.path.dirname( outfile )
@@ -305,8 +303,8 @@ def imweightedaverage( imagelist, whtlist, outfile, outwht,
         whtarray += whtdat
         ncombinearray += where(whtdat > 0, ones(whtdat.shape),
                                zeros(whtdat.shape))
-        outhdr.update(("SRCIM%02i" % imfilenum, imfile,
-                       "source im %i, used in whted avg" % imfilenum))
+        outhdr.update({"SRCIM%02i" % imfilenum: (
+            imfile, "source im %i, used in whted avg" % imfilenum)})
 
     # outscidat = nan_to_num( sumarray / whtarray )
     # outscidat = sumarray / whtarray
