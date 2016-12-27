@@ -92,7 +92,7 @@ def camfiltername(imfile):
     from the image header.
     Returns a string giving camera-filtername or instr-det-filter
     """
-    import pyfits
+    from astropy.io import fits as pyfits
     hdr = pyfits.getheader( imfile )
 
     namelist = []
@@ -134,7 +134,7 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
 
     Returns the names of all files generated (sci, wht, bpx)
     """
-    import pyfits
+    from astropy.io import fits as pyfits
     import imarith
     import shutil
     import badpix
@@ -222,7 +222,7 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     import os
     import imarith
     import badpix
-    import pyfits
+    from astropy.io import fits as pyfits
 
     targdir = '%s.e%02i'%(targname, targepoch)
     targsci = '%s_%s_e%02i_reg_drc_sci.fits'%(targname, targfilter, targepoch)

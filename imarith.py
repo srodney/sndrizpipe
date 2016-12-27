@@ -5,6 +5,8 @@ S.Rodney 2014.02.26
 Functions for combining and modifying science images.
 
 """
+from astropy.io import fits as pyfits
+
 
 def immultiply( image, scalefactor, outfile=None, clobber=False, verbose=False):
     """
@@ -13,7 +15,6 @@ def immultiply( image, scalefactor, outfile=None, clobber=False, verbose=False):
     the scaled image data array is returned. 
     """
     import os
-    import pyfits
     from numpy import ndarray
     import exceptions
 
@@ -53,7 +54,6 @@ def imsum( image1, image2, outfile=None, clobber=False, verbose=False):
     name.  Otherwise, the summed image data array is returned.
     """
     import os
-    import pyfits
     from numpy import ndarray
     import exceptions
 
@@ -120,8 +120,6 @@ def imsubtract( image1, image2, outfile=None,
     trimmed or extended if needed.)  
     """
     import os
-    import pyfits
-    from numpy import ndarray
     import exceptions
 
     if debug  : import pdb; pdb.set_trace()
@@ -176,8 +174,7 @@ def combine_ivm_maps( im1, im2, outfile, clobber=False, verbose=False):
     Returns the name of the output composite weight map.
     """
     import os
-    import pyfits
-    from numpy import array, uint8, ma
+    from numpy import ma
 
     if os.path.exists( outfile ) :
         if not clobber :
@@ -217,9 +214,7 @@ def imaverage( imagelist, outfile,
      Returns name of outfile
     """
     import os
-    import pyfits
-    from numpy import where, ones, zeros, array, ndarray, nan_to_num,float32
-    import exceptions
+    from numpy import where, ones, zeros, float32
 
     if os.path.exists(outfile)  :
         if clobber :
@@ -267,9 +262,7 @@ def imweightedaverage( imagelist, whtlist, outfile, outwht,
      Returns name of outfile and whtfile
     """
     import os
-    import pyfits
-    from numpy import where, ones, zeros, array, ndarray, nan_to_num,float32
-    import exceptions
+    from numpy import where, ones, zeros, float32
 
     if os.path.exists(outfile)  :
         if clobber :

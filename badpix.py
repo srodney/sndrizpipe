@@ -5,6 +5,7 @@ Functions for making, combining and applying bad pixel masks
 that are constructed from HST weight maps.
 
 """
+from astropy.io import fits as pyfits
 
 
 def zerowht2badpix( whtfile, badpixfile,  
@@ -15,10 +16,8 @@ def zerowht2badpix( whtfile, badpixfile,
 
     Returns : the name of the output bad pixel file.
     """
-    import pyfits
     import numpy as np
     import os
-    import exceptions
     if verbose : print("Converting %s into bad pixel mask %s"%(whtfile,badpixfile))
 
     if debug: import pdb; pdb.set_trace()
@@ -69,8 +68,6 @@ def applymask( scifile, badpixfile, outfile=None,
 
     """
     import os
-    import pyfits
-    from numpy import where
 
     if not outfile : 
         if scifile.endswith('sci.fits') : 
@@ -110,8 +107,7 @@ def unionmask( imfile1, imfile2, outfile, clobber=False, verbose=False):
     Returns the name of the output union bad pixel mask file.
     """
     import os
-    import pyfits
-    import exceptions
+
     from numpy import array, uint8
 
     # read in the images
@@ -152,9 +148,6 @@ def applyUnionMask( scifile, badpixfile1, badpixfile2, outfile=None,
 
     """
     import os
-    import pyfits
-    from numpy import where
-    import exceptions
     from numpy import array, uint8
 
     # read in the badpix images

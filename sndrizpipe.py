@@ -87,7 +87,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     Primary pipeline function.  Executes all the intermediate steps: 
        register, sort, drizzle, subtract, mask
     """
-    import pyfits
+    from astropy.io import fits as pyfits
     import shutil
     if debug:
         import pdb
@@ -143,7 +143,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         doreg = True
         dodriz2 = True
         dodiff = True
-        dostack = False
+        # Note: we don't set dostack = True with doall, so you have to use
+        #  --dostack to get a stacked image
 
     # For single-star registrations, set some useful defaults for the user
     if singlestar:

@@ -2,7 +2,7 @@
 # S.Rodney 2014.02.25
 
 import os
-import pyfits
+from astropy.io import fits as pyfits
 import exceptions
 
 from stsci import tools

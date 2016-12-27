@@ -254,7 +254,7 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
     You can extend the effective size of the science frame by <buffer>
     pixels.
     """
-    import pyfits
+    from astropy.io import fits as pyfits
     import pywcs
     import numpy as np
     if debug : import pdb; pdb.set_trace()
@@ -396,7 +396,7 @@ class Exposure( object ):
                      targetradec=[None,None], combinefilterdict=None):
         """ Initialize an Exposure object from an flt.fits file.
         """
-        import pyfits
+        from astropy.io import fits as pyfits
         import os
         from math import ceil
         from numpy import nan

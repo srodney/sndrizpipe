@@ -3,8 +3,6 @@
 
 import os
 from astropy.io import fits as pyfits
-# import exceptions
-
 from stsci import tools
 from drizzlepac import tweakreg
 import stwcs
@@ -524,7 +522,6 @@ def getpixscale( fitsfile, returntuple=False ):
     axes.  For returntuple=False, return the average of the two.
     """
     from math import sqrt
-    import pyfits
 
     if isinstance(fitsfile, basestring) :
         fitsfile = pyfits.open( fitsfile )
