@@ -2,7 +2,7 @@
 # S.Rodney 2014.02.27
 
 import os
-import pyfits
+from astropy.io import fits as pyfits
 # import exceptions
 
 from stsci import tools
@@ -11,15 +11,15 @@ import stwcs
 import exceptions
 
 
-def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
-                 wcsname='SNDRIZPIPE', refnbright=None,
-                 rfluxmax=None, rfluxmin=None, searchrad=1.0,
-                 # fluxmax=None, fluxmin=None,
+def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
+                wcsname='SNDRIZPIPE', refnbright=None,
+                rmaxflux=None, rminflux=None, searchrad=1.0,
+                # fluxmax=None, fluxmin=None,
                  nclip=3, sigmaclip=3.0, computesig=False,
-                 peakmin=None, peakmax=None, threshold=4.0,
-                 minobj=10, nbright=None, fitgeometry='rscale',
-                 interactive=False, clean=False, clobber=False,
-                 verbose=False, debug=False ):
+                peakmin=None, peakmax=None, threshold=4.0,
+                minobj=10, nbright=None, fitgeometry='rscale',
+                interactive=False, clean=False, clobber=False,
+                verbose=False, debug=False):
     """Run tweakreg on a set of flt files or drz files."""
     if debug : import pdb; pdb.set_trace()
     from astropy.io import ascii
@@ -98,7 +98,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                               refimage=refim, refxcol=1, refycol=2,
                               refxyunits='degrees', rfluxcol=rfluxcol,
                               rfluxunits=rfluxunits, refnbright=refnbright,
-                              rfluxmax=rfluxmax, rfluxmin=rfluxmin,
+                              rmaxflux=rmaxflux, rminflux=rminflux,
                               # fluxmax=fluxmax, fluxmin=fluxmin,
                               peakmax=peakmax, peakmin=peakmin,
                               searchrad=searchrad, conv_width=conv_width,
@@ -108,7 +108,7 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                               xcol=xcol, ycol=ycol,
                               fluxcol=fluxcol, fluxunits='cps',
                               clean=(clean and not nbright),
-                              writecat=(not nbright) )
+                              writecat=(not nbright))
             print( "==============================\n sndrizzle.register:\n")
             userin = raw_input("Adopt these tweakreg settings? y/[n]").lower()
             if userin.startswith('y'): 
@@ -116,8 +116,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                 break
             print("Current tweakreg/imagefind parameters:")
             printfloat("   refnbright = %i  # number of brightest refcat sources to use", refnbright)
-            printfloat("   rfluxmin = %.1f  # min flux for refcat sources", rfluxmin)
-            printfloat("   rfluxmax = %.1f  # max flux for refcat sources", rfluxmax)
+            printfloat("   rminflux = %.1f  # min flux for refcat sources", rminflux)
+            printfloat("   rminflux = %.1f  # max flux for refcat sources", rmaxflux)
             printfloat("   searchrad  = %.1f  # matching search radius (arcsec)", searchrad )
             printfloat("   peakmin    = %.1f  # min peak flux for detected sources", peakmin )
             printfloat("   peakmax    = %.1f  # max peak flux for detected sources", peakmax )
@@ -140,8 +140,8 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                     print('Must use the "parname = value" syntax. Try again') 
                     continue
                 if parname=='refnbright' : refnbright=int( value )
-                elif parname=='rfluxmin' : rfluxmin=float( value )
-                elif parname=='rfluxmax' : rfluxmax=float( value )
+                elif parname=='rminflux' : rminflux=float(value)
+                elif parname=='rmaxflux' : rmaxflux=float(value)
                 elif parname=='searchrad' : searchrad=float( value )
                 elif parname=='peakmin' : peakmin=float( value )
                 elif parname=='peakmax' : peakmax=float( value )
@@ -175,16 +175,16 @@ def RunTweakReg( files='*fl?.fits', refcat=None, refim=None,
                       computesig=computesig, skysigma=skysigma,
                       fitgeometry=fitgeometry, nclip=nclip, sigma=sigmaclip,
                       refcat=refcat, refimage=refim,
-                      refxcol=1, refycol=2, refxyunits='degrees', 
+                      refxcol=1, refycol=2, refxyunits='degrees',
                       refnbright=refnbright, rfluxcol=rfluxcol, rfluxunits=rfluxunits,
-                      rfluxmax=rfluxmax, rfluxmin=rfluxmin,
+                      rmaxflux=rmaxflux, rminflux=rminflux,
                       # fluxmax=fluxmax, fluxmin=fluxmin,
                       peakmax=peakmax, peakmin=peakmin,
                       searchrad=searchrad, conv_width=conv_width, threshold=threshold,
                       catfile=srcCatListFile, nbright=nbright,
                       xcol=xcol, ycol=ycol, fluxcol=fluxcol, fluxunits='cps',
                       separation=0, tolerance=1.0, minobj=minobj,
-                      clean=clean, writecat=not nbright )
+                      clean=clean, writecat=not nbright)
     return( wcsname )
 
 
@@ -346,17 +346,18 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     return( wcsname )
 
 
-def clearAltWCS( fltlist ) : 
+def clearAltWCS(fltlist):
     """ pre-clean any alternate wcs solutions from flt headers"""
     from drizzlepac import wcs_functions
 
-    for fltfile in fltlist : 
-        hdulist = pyfits.open( fltfile, mode='update' )
+    for fltfile in fltlist:
+        hdulist = pyfits.open(fltfile, mode='update')
         extlist = []
-        for ext in range( len(hdulist) ) : 
-            if 'WCSNAME' in hdulist[ext].header : extlist.append( ext )
-            stwcs.wcsutil.restoreWCS( hdulist, ext, wcskey='O' )
-        if len(extlist) : 
+        for ext in range(len(hdulist)):
+            if 'WCSNAME' in hdulist[ext].header:
+                extlist.append(ext)
+            stwcs.wcsutil.restoreWCS(hdulist, ext, wcskey='O')
+        if len(extlist):
             wcs_functions.removeAllAltWCS(hdulist, extlist)
         hdulist.flush()
         hdulist.close()
