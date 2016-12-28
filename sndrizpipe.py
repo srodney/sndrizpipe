@@ -839,7 +839,23 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 driz_cr=drizcr, driz_cr_snr=drizcrsnr,
                 singlesci=False, clean=clean, combine_type=combine_type,
                 clobber=clobber, verbose=verbose, debug=debug)
+
             os.chdir(topdir)
+            # make a stacked diff image (for locating SN center)
+            drzsuffix = explistFE[0].drzsuffix
+            tempdir = os.path.join(os.path.abspath(topdir),
+                                   outroot + '.e%02i' % tempepoch)
+            tempsci = os.path.join(tempdir, '%s_%s_e%02i_reg_%s_sci.fits' % (
+                outroot, filter, tempepoch, drzsuffix))
+            subsciStack = os.path.join(os.path.abspath(stackdir),
+                                       (outrootStack + "-e%02i_sub_sci.fits" %
+                                        tempepoch))
+            if os.path.isfile(tempsci):
+                print(" Making diff image from the stack %s" % outrootStack)
+                diffim = imarith.imsubtract(tempsci, outsciStack,
+                                            outfile=subsciStack,
+                                            clobber=clobber,
+                                            verbose=verbose, debug=debug)
             pass  # end for filter in filterlist
 
     if clean > 1:
