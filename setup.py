@@ -8,6 +8,11 @@ import sys
 import ah_bootstrap
 from setuptools import setup
 
+try:
+    os.system('conda config --add channels http://ssb.stsci.edu/astroconda')
+except:
+    pass
+
 # A dirty hack to get around some early import/configurations ambiguities
 if sys.version_info[0] >= 3:
     import builtins
@@ -95,8 +100,7 @@ package_info = get_package_info()
 
 # Add the project-global data
 package_info['package_data'].setdefault(PACKAGENAME, [])
-package_info['package_data'][PACKAGENAME].append('data/*.*')
-package_info['package_data'][PACKAGENAME].append('data/HSTFILTERS/*')
+package_info['package_data'][PACKAGENAME].append('HSTFILTERS/*')
 
 # Define entry points for command-line scripts
 entry_points = {'console_scripts': []}
