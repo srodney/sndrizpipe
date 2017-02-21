@@ -8,11 +8,6 @@ import sys
 import ah_bootstrap
 from setuptools import setup
 
-try:
-    os.system('conda config --add channels http://ssb.stsci.edu/astroconda')
-except:
-    pass
-
 # A dirty hack to get around some early import/configurations ambiguities
 if sys.version_info[0] >= 3:
     import builtins
@@ -125,12 +120,17 @@ package_info['package_data'][PACKAGENAME].extend(c_files)
 # Note that requires and provides should not be included in the call to
 # ``setup``, since these are now deprecated. See this link for more details:
 # https://groups.google.com/forum/#!topic/astropy-dev/urYO8ckB2uM
-
+with open('dependencies.txt') as f:
+  lines=f.readlines()
+  for line in lines:
+    if line[0]!='_':
+      metadata['install_requires']+=(' '+line)
+f.close()
 setup(name=PACKAGENAME,
       version=VERSION,
       description=DESCRIPTION,
       scripts=scripts,
-      install_requires=metadata.get('install_requires', 'astropy').strip().split(),
+      requires=metadata.get('install_requires', 'astropy').strip().split(),
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
