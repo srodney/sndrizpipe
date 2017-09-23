@@ -231,7 +231,7 @@ def imaverage( imagelist, outfile,
 
     # construct the weighted average and update header keywords
     outhdr = pyfits.getheader( imagelist[0] )
-    for imfilenum, imfile in zip(range(1, len(imagelist) + 1, imagelist)):
+    for imfilenum, imfile in zip(range(1, len(imagelist) + 1), imagelist):
         imdat = pyfits.getdata(imfile)
         sumarray += imdat
         ncombinearray += where( imdat != 0 , ones(imdat.shape), zeros(imdat.shape) )

@@ -312,13 +312,13 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     # locate the appropriate extensions for updating
     hdulist = pyfits.open( imfile )
     sciextlist = [ hdu.name for hdu in hdulist if 'WCSAXES' in hdu.header ]
-    # convert the target position from ra,de to x,y
+    # convert the target position from ra,dec to x,y
     if len(sciextlist)>0:
         imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=(sciextlist[0],1) )
     else:
         sciextlist = ['PRIMARY']
         imwcs = stwcs.wcsutil.HSTWCS( hdulist, ext=None )
-    xref, yref = imwcs.wcs_sky2pix( ra, dec , 1)
+    xref, yref = imwcs.wcs_world2pix( ra, dec , 1)
 
     # If the new centroid position differs substantially from the original
     # ndfind position, then update the found source position
@@ -421,11 +421,13 @@ def mkSourceCatalog( imfile, computesig=True, skysigma=0,
     for iext in iextlist:
         wcs = wcsutil.HSTWCS( image, ext=iext)
         imcat = catalogs.generateCatalog(
-            wcs, mode='automatic',catalog=None, computesig=computesig,
+            wcs, mode='automatic', catalog=imfile+'[%i]' % iext,
+            computesig=computesig,
             skysigma=skysigma, threshold=threshold, conv_width=conv_width,
             peakmin=peakmin, peakmax=peakmax,
-            fluxmin=fluxmin, fluxmax= fluxmax,
-            nsigma=nsigma, )
+            fluxmin=fluxmin, fluxmax=fluxmax,
+            nsigma=nsigma, sharplo=0.2, sharphi=1, roundlo=-1, roundhi=1,
+            ratio=1, theta=0, use_sharp_round=True)
         imcat.buildCatalogs()
         xycatfile = imfile.replace('.fits','_%i_xy.coo'%iext )
         imcat.writeXYCatalog(xycatfile)
