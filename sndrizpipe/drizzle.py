@@ -91,10 +91,14 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
     if verbose : print("Drizzling %i flts to make %s."%(len(fltlist),outroot))
+    if driz_cr<0 or (driz_cr and docombine):
+        resetbits = 0
+    else:
+        resetbits = 4096
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
         updatewcs=False, wcskey=wcskey, build=False,
-        resetbits=int((driz_cr<0 or (driz_cr and docombine)) and 4096),
+        resetbits=resetbits,
         restore=(not clobber), preserve=True, overwrite=clobber, clean=clean,
         median=docombine, blot=(driz_cr>0 and docombine),
         driz_cr=(driz_cr>0 and docombine),
@@ -212,9 +216,13 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     else :
         naxis1 = imsize_arcsec/pixscale
         naxis2 = imsize_arcsec/pixscale
+    if driz_cr:
+        resetbits = 4096
+    else:
+        resetbits = 0
     astrodrizzle.AstroDrizzle(
         fltlist, output=outroot, runfile=outroot+'_astrodriz.log',
-        updatewcs=False, build=False, resetbits=(driz_cr and 4096),
+        updatewcs=False, build=False, resetbits=resetbits,
         restore=False, preserve=True, overwrite=True, clean=clean,
         median=docombine, blot=docombine,
         driz_cr=(driz_cr>0 and docombine),  driz_cr_snr=driz_cr_snr,
