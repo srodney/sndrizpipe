@@ -21,15 +21,14 @@ section 7.5 of the drizzlepac handbook:
 """
 
 import glob
-import exceptions
 import os
 import stat
-import register
-import exposures
-import drizzle
-import badpix
-import imarith
 import numpy as np
+from . import register
+from . import exposures
+from . import drizzle
+from . import badpix
+from . import imarith
 
 # file permissions for chmod ug+rw o+r
 PERMISSIONS = (stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP |
@@ -45,9 +44,9 @@ def multipipe():
     # look for flt/flc/flm files in directories called <rootname>.flt
     fltdirlist = glob.glob("*.flt")
     if not len(fltdirlist):
-        exceptions.RuntimeError("There is no <rootname>.flt directory!")
-        for fltdir in fltdirlist:
-            runpipe(fltdir)
+        raise RuntimeError("There is no <rootname>.flt directory!")
+    for fltdir in fltdirlist:
+        runpipe(fltdir)
 
 
 # TODO : write a log file, recording user settings and results
@@ -97,7 +96,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
 
     # Check for logically incompatible parameters
     if nbright and minobj and (nbright < minobj - 1):
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             ' nbright < minobj \n'
             'You have nbright=%i and minobj=%i\n' % (nbright, minobj) +
             "That doesn't work.")
@@ -106,7 +105,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     else:
         fitgeometry = 'rscale'
     if fitgeometry == 'rscale' and ((nbright and nbright < 3) or minobj < 3):
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             ' Not requiring enough stars for rotation+scale fit.\n'
             'You have nbright=%i and minobj=%i\n' % (nbright, minobj) +
             "and you also have fitgeometry='rscale'."
@@ -121,13 +120,13 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     if type(onlyepochs) in [str, int, float]:
         onlyepochs = [int(ep) for ep in str(onlyepochs).split(',')]
     if tempfilters is not None and len(onlyfilters) != 1:
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             'You specified filter(s) to combine/scale for the template epoch'
             'but you did not limit the processing to a single filter.'
             "If you use --tempfilters then you must also specify a "
             "single filter for processing with '--filters X'")
     if singlestar and ((ra is None) or (dec is None)):
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             'If you set the --singlestar flag for processing a single '
             '(standard) star then you MUST also provide a target RA and '
             'DEC with the --ra and --dec options.')
@@ -169,8 +168,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         epochlistfile = "%s_epochs.txt" % outroot
     fltlist = glob.glob("%s/*fl?.fits" % fltdir)
     if not len(fltlist):
-        raise (exceptions.RuntimeError(
-            "There are no flt/flc/flm files in %s !!" % fltdir))
+        raise RuntimeError(
+            "There are no flt/flc/flm files in %s !!" % fltdir)
 
     if os.path.exists(epochlistfile):
         explist_all = exposures.read_explist(
@@ -210,7 +209,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                                    onlyfilters=None, onlyepochs=None)
 
     if refim and not os.path.exists(refim):
-        raise exceptions.RuntimeError('Ref image %s does not exist.' % refim)
+        raise RuntimeError('Ref image %s does not exist.' % refim)
     if not refim:
         # No refimage has been specified, so set the default refimage name
         refdrzdir = '%s.refim' % outroot
@@ -296,7 +295,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 if len(unique_visits) == 1:
                     refvisit = unique_visits[0]
                 elif len(unique_visits) < 1:
-                    raise exceptions.RuntimeError(
+                    raise RuntimeError(
                         "No visits satisfy the refimage requirements:\n" +
                         "  filter = %s     epoch = %s" % (reffilter, refepoch))
                 else:
@@ -314,7 +313,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                                 exp.filter == reffilter and
                                 exp.pidvisit == refvisit])
             if len(explistRI) < 1:
-                raise exceptions.RuntimeError(
+                raise RuntimeError(
                     "Error : not enough exposures for refim with"
                     "epoch %i  ;  filter %s  ;  visit %s  " % (
                         refepoch, reffilter, refvisit))
@@ -471,7 +470,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         if not singlestar:
             refim = os.path.abspath(refim)
             if not os.path.exists(refim):
-                raise exceptions.RuntimeError(
+                raise RuntimeError(
                     "No refim file %s!  Maybe you should re-run with "
                     "dorefim=True." % refim)
 
@@ -498,7 +497,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             os.chdir(epochdir)
 
             if not os.path.exists(outsciFEV):
-                exceptions.RuntimeError("Missing %s." % outsciFEV)
+                RuntimeError("Missing %s." % outsciFEV)
             origwcs = pyfits.getval(outsciFEV, 'WCSNAME').strip()
 
             if singlestar:
@@ -740,7 +739,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 continue
             filterkeylist = combinefilterdict['diffimfiles'][epoch].keys()
             if len(filterkeylist) == 0:
-                print "No suitable diff images for combination."
+                print("No suitable diff images for combination.")
                 continue
             difflist = [combinefilterdict['diffimfiles'][epoch][f]
                          for f in filterkeylist]
@@ -1216,7 +1215,7 @@ def main():
     combinefilterdict = {'method':None, 'name':None, 'filterlist':None}
     if argv.combinefilterlist:
         if not argv.combinefiltername or not argv.combinefiltermethod:
-            raise exceptions.SyntaxError(
+            raise SyntaxError(
                 "When specifying a set of bands to be combined (using "
                 "--combinefilterlist), you must also specify "
                 "a name for the combination using --combinebandname and "

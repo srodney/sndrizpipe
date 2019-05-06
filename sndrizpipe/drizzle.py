@@ -3,7 +3,6 @@
 
 import os
 from astropy.io import fits as pyfits
-import exceptions
 
 from stsci import tools
 from drizzlepac import tweakreg, astrodrizzle
@@ -42,7 +41,7 @@ def hotpixPostargClean( flt1, flt2, verbose=False ):
         ncr1 = len( np.where( np.ravel(crflags1) )[0] )
         ncr2 = len( np.where( np.ravel(crflags2) )[0] )
         nhotpix = len( np.where( np.ravel(hotpixflags) )[0] )
-        print( "Removed (%i,%i) CR flags, and re-flagged %i as hot pixels"%(ncr1,ncr2,nhotpix) )
+        print(( "Removed (%i,%i) CR flags, and re-flagged %i as hot pixels"%(ncr1,ncr2,nhotpix) ))
 
     im1.flush()
     im1.close()
@@ -90,7 +89,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
-    if verbose : print("Drizzling %i flts to make %s."%(len(fltlist),outroot))
+    if verbose : print(("Drizzling %i flts to make %s."%(len(fltlist),outroot)))
     if driz_cr<0 or (driz_cr and docombine):
         resetbits = 0
     else:
@@ -124,7 +123,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
             os.rename(outwhtfile.replace('drc','drz'), outwhtfile)
 
     if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
-        raise exceptions.RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
+        raise RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
 
     scrubnans( outscifile )
     scrubnans( outwhtfile )
@@ -152,7 +151,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
     Returns the names of the output sci and wht.fits images.
     """
     if debug : import pdb; pdb.set_trace()
-    import badpix
+    from . import badpix
 
     #convert the input list into a useable list of images for astrodrizzle
     if type( fltlist ) == str : 
@@ -253,7 +252,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             os.rename(outwhtfile.replace('drc','drz'), outwhtfile)
 
     if (not os.path.isfile(outscifile)) or (not os.path.isfile(outwhtfile)):
-        raise exceptions.RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
+        raise RuntimeError( "astrodriz.py says : Astrodrizzle did not produce the expected output files %s and %s"%(outscifile,outwhtfile) )
 
     scrubnans( outscifile ) 
     scrubnans( outwhtfile )
@@ -281,7 +280,7 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             scifile0 = fltfile.replace(fltsfx,'_single_sci.fits')
             scifile1 = outroot + '_' + scifile0
             if not os.path.isfile( scifile0 ) :
-                raise exceptions.RuntimeError('Missing _single_sci.fits file %s'%scifile0)
+                raise RuntimeError('Missing _single_sci.fits file %s'%scifile0)
             os.rename( scifile0, scifile1 )
             whtfile0 = scifile0.replace( '_sci.fits','_wht.fits')
             whtfile1 = scifile1.replace( '_sci.fits','_wht.fits')
@@ -353,7 +352,7 @@ def getdrizpar( instrument, detector, nexposures=None ) :
             return( {'pixscale':pixscale, 'pixfrac':1.0, 'imsize_arcsec':30,
                      'drizbits':'32'} )
     else :
-        raise exceptions.RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )
+        raise RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )
 
 
 def scrubnans( filename, fillval=0 ):

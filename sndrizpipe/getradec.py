@@ -41,7 +41,7 @@ def main():
     argv = parser.parse_args()
     verbose = argv.verbose
     if verbose:
-        print('Looking for FLT files in %s' % argv.fltdir)
+        print(('Looking for FLT files in %s' % argv.fltdir))
 
     if argv.includeflc:
         fltlist = glob(path.join(argv.fltdir, '*fl?.fits'))
@@ -49,12 +49,12 @@ def main():
         fltlist = glob(path.join(argv.fltdir, 'i*flt.fits'))
 
     if verbose:
-        print('Found %i FLT files.' % len(fltlist))
+        print(('Found %i FLT files.' % len(fltlist)))
 
     targnamelist, ralist, declist = [], [], []
     for fltfile in fltlist:
         if verbose:
-            print('checking %s' % fltfile)
+            print(('checking %s' % fltfile))
 
         targnamelist.append(pyfits.getval(fltfile, 'TARGNAME', ext=0))
         ralist.append(pyfits.getval(fltfile, 'CRVAL1', ext=1))
@@ -65,9 +65,9 @@ def main():
 
 
     targname = ' '.join(np.unique(targnamelist).tolist())
-    print("TARGET=%s" % targname)
-    print("RA=%.6f" % ra)
-    print("DEC=%.6f" % dec)
+    print(("TARGET=%s" % targname))
+    print(("RA=%.6f" % ra))
+    print(("DEC=%.6f" % dec))
     return 0
 
 

@@ -6,7 +6,6 @@ from astropy.io import fits as pyfits
 from stsci import tools
 from drizzlepac import tweakreg
 import stwcs
-import exceptions
 
 
 def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
@@ -29,7 +28,7 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
         filelist = files
         files = ','.join( filelist ).strip(',')
     if len(filelist)==0 :
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             "List of input files has no real files: %s"%str(files))
 
     # pre-clean any existing WCS header info
@@ -49,12 +48,12 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
         use2dhist=True
 
     # check first if the WCS wcsname already exists in the first image
-    wcsnamelist = [ hdr1[k] for k in hdr1.keys() if k.startswith('WCSNAME') ]
+    wcsnamelist = [ hdr1[k] for k in list(hdr1.keys()) if k.startswith('WCSNAME') ]
     if wcsname in wcsnamelist and not clobber :
-        print(
+        print((
             "WCSNAME %s already exists in %s"%(wcsname,filelist[0]) +
             "so I'm skipping over this tweakreg step." +
-            "Re-run with clobber=True if you really want it done." )
+            "Re-run with clobber=True if you really want it done." ))
         return( wcsname )
 
     rfluxcol, rfluxunits = None, None
@@ -79,7 +78,7 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
                     filelist, filelist[0].split('_')[0]+'_cat.list',
                     threshold=threshold, peakmin=peakmin, peakmax=peakmax )
                 if verbose :
-                    print( "Generated a list of source catalogs : %s"%srcCatListFile)
+                    print(( "Generated a list of source catalogs : %s"%srcCatListFile))
                 xcol, ycol, fluxcol = 1,2,3
             else :
                 srcCatListFile=None
@@ -108,7 +107,7 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
                               clean=(clean and not nbright),
                               writecat=(not nbright))
             print( "==============================\n sndrizzle.register:\n")
-            userin = raw_input("Adopt these tweakreg settings? y/[n]").lower()
+            userin = input("Adopt these tweakreg settings? y/[n]").lower()
             if userin.startswith('y'): 
                 print("OK. Proceeding to update headers.")
                 break
@@ -129,7 +128,7 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
 
             print('Enter "run" to re-run tweakreg with new parameters.') 
             while True : 
-                userin = raw_input("   ").lower()
+                userin = input("   ").lower()
                 if userin.startswith('run') : break
                 try : 
                     parname = userin.split('=')[0].strip()
@@ -159,14 +158,14 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
             filelist, filelist[0].split('_')[0]+'_cat.list',
             threshold=threshold, peakmin=peakmin, peakmax=peakmax )
         if verbose :
-            print( "Generated a list of source catalogs : %s"%srcCatListFile)
+            print(( "Generated a list of source catalogs : %s"%srcCatListFile))
         xcol, ycol, fluxcol = 1,2,3
     else :
         srcCatListFile=None
         nbright=None
         xcol, ycol, fluxcol = 1,2,None
 
-    print( 'fitgeometry = %s'%fitgeometry )
+    print(( 'fitgeometry = %s'%fitgeometry ))
     tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       use2dhist=use2dhist,
                       see2dplot=False, residplot='No plot',
@@ -207,8 +206,8 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     if refim is None : refim = imfile
     if computesig==False :
         skysigma = getskysigma( imfile )
-        if verbose : print("sndrizipipe.register.SingleStarReg: "
-                           " Manually computed sky sigma for %s as %.5e"%(imfile,skysigma))
+        if verbose : print(("sndrizipipe.register.SingleStarReg: "
+                           " Manually computed sky sigma for %s as %.5e"%(imfile,skysigma)))
     else :
         skysigma=0.0
 
@@ -237,17 +236,17 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
             threshold /= 2.
             continue
     if xycatfile is None :
-        print( "Failed to generate a clean source catalog for %s"%imfile + \
-            " using threshmin = %.3f"%threshmin )
+        print(( "Failed to generate a clean source catalog for %s"%imfile + \
+            " using threshmin = %.3f"%threshmin ))
         import pdb; pdb.set_trace()
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             "Failed to generate a clean source catalog for %s"%imfile + \
             " using threshmin = %.3f"%threshmin )
 
     xycat = ascii.read( xycatfile )
     radeccat = ascii.read( radeccatfile )
     if verbose :
-        print("Located %i sources with threshold=%.1f sigma"%(len(xycat),threshold))
+        print(("Located %i sources with threshold=%.1f sigma"%(len(xycat),threshold)))
 
     os.chdir( topdir )
 
@@ -258,7 +257,7 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
     inear = where( darcsec <= searchrad )[0]
 
     if verbose :
-        print("   %i of these sources are within %.1f arcsec of the target"%(len(inear),searchrad))
+        print(("   %i of these sources are within %.1f arcsec of the target"%(len(inear),searchrad)))
 
     # identify the brightest source within searchrad arcsec of the target
     ibrightest = inear[ xycat['col3'][inear].argmax() ]
@@ -266,7 +265,7 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
 
     if verbose :
         brightratio = xycat['col3'][ibrightest] / median(xycat['col3'][inear])
-        print("   The brightest of these sources is %.1fx brighter than the median."%brightratio)
+        print(("   The brightest of these sources is %.1fx brighter than the median."%brightratio))
 
     # The TweakReg imagefind algorithm sometimes misses the true center
     # catastrophically. Here we use a centroiding algorithm to re-center the
@@ -307,7 +306,7 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
         pl.draw()
         outpng = imfile.replace('.fits','_recenter.png')
         pl.savefig(outpng)
-        print("Saved a recentering image as " + outpng )
+        print(("Saved a recentering image as " + outpng ))
 
     # locate the appropriate extensions for updating
     hdulist = pyfits.open( imfile )
@@ -334,8 +333,8 @@ def SingleStarReg( imfile, ra, dec, wcsname='SINGLESTAR',
 
     # apply that shift to the image wcs
     for sciext in unique(sciextlist):
-        print("Updating %s ext %s with xshift,yshift = %.5f %.5f"%(
-            imfile,sciext, xshift, yshift ))
+        print(("Updating %s ext %s with xshift,yshift = %.5f %.5f"%(
+            imfile,sciext, xshift, yshift )))
         updatewcs_with_shift(imfile, refim, wcsname=wcsname,
                              rot=0.0, scale=1.0, xsh=xshift, ysh=yshift,
                              fit=None, xrms=None, yrms=None, verbose=verbose,
@@ -366,16 +365,16 @@ def printfloat( fmtstr, value ):
     None and NaN values appropriately
     """
     try :
-        print( fmtstr % value ) 
+        print(( fmtstr % value )) 
     except : 
         pct = fmtstr.find('%')
         f = pct + fmtstr[pct:].find('f') + 1
         if value == None : 
-            print( fmtstr[:pct] + ' None ' + fmtstr[f:] )
+            print(( fmtstr[:pct] + ' None ' + fmtstr[f:] ))
         elif value == float('nan') :
-            print( fmtstr[:pct] + ' NaN ' + fmtstr[f:] )
+            print(( fmtstr[:pct] + ' NaN ' + fmtstr[f:] ))
         else : 
-            print( fmtstr[:pct] + ' ??? ' + fmtstr[f:] )
+            print(( fmtstr[:pct] + ' ??? ' + fmtstr[f:] ))
 
 
 def mkSourceCatList( imfilelist, listfilename, computesig=True, skysigma=0,
@@ -391,7 +390,7 @@ def mkSourceCatList( imfilelist, listfilename, computesig=True, skysigma=0,
             imfile, computesig=computesig, skysigma=skysigma,
             threshold=threshold, peakmin=peakmin, peakmax=peakmax,
             nsigma=nsigma, fluxmin=fluxmin, fluxmax=fluxmax )
-        print >> fout, '%s %s'%( imfile, '  '.join(catlist) )
+        print('%s %s'%( imfile, '  '.join(catlist) ), file=fout)
     fout.close()
     return( listfilename )
 
@@ -525,7 +524,7 @@ def getpixscale( fitsfile, returntuple=False ):
     """
     from math import sqrt
 
-    if isinstance(fitsfile, basestring) :
+    if isinstance(fitsfile, str) :
         fitsfile = pyfits.open( fitsfile )
     if isinstance( fitsfile, pyfits.header.Header ) :
         hdr = fitsfile
@@ -539,7 +538,7 @@ def getpixscale( fitsfile, returntuple=False ):
     elif isinstance( fitsfile, pyfits.hdu.image.PrimaryHDU ) :
         hdr = fitsfile.header
     else :
-        raise exceptions.RuntimeError( 'input object type %s is unrecognized')
+        raise RuntimeError( 'input object type %s is unrecognized')
 
     if 'CD1_1' in hdr :
         cd11 = hdr['CD1_1']
@@ -559,7 +558,7 @@ def getpixscale( fitsfile, returntuple=False ):
         else :
             cdelt1 = sgn*sqrt(cd11**2 + cd12**2)
             cdelt2 = sqrt(cd22**2 + cd21**2)
-    elif 'CDELT1' in hdr.keys() and (hdr['CDELT1']!=1 and hdr['CDELT2']!=1) :
+    elif 'CDELT1' in list(hdr.keys()) and (hdr['CDELT1']!=1 and hdr['CDELT2']!=1) :
         cdelt1 = hdr['CDELT1']
         cdelt2 = hdr['CDELT2']
 
@@ -595,7 +594,7 @@ def getfwhmpix( imfile ):
     elif telescope=='HST' :
         fwhmarcsec = 0.1
     else :
-        print("WARNING : no instrument, detector or telescope identified for %s"%imfile)
+        print(("WARNING : no instrument, detector or telescope identified for %s"%imfile))
         print("  so we are arbitrarily setting the FWHM to 2.5 pixels for centroiding")
         return( 2.5 )
     pixscale = getpixscale( imfile )
@@ -728,7 +727,7 @@ def cntrd(img, x, y, fwhm, silent=False, debug=False, extendbox = False, keepcen
             if ( (ix[i] < nhalfbig) or ((ix[i] + nhalfbig) > xsize-1) or \
                      (iy[i] < nhalfbig) or ((iy[i] + nhalfbig) > ysize-1) ):
                 if not silent:
-                    print('Position '+ pos + ' too near edge of image')
+                    print(('Position '+ pos + ' too near edge of image'))
                     xcen[i] = -1   ; ycen[i] = -1
                     continue
 
@@ -761,7 +760,7 @@ def cntrd(img, x, y, fwhm, silent=False, debug=False, extendbox = False, keepcen
         if ( (xmax < nhalf) or ((xmax + nhalf) > xsize-1) or \
                  (ymax < nhalf) or ((ymax + nhalf) > ysize-1) ):
             if not silent:
-                print('Position '+ pos + ' moved too near edge of image')
+                print(('Position '+ pos + ' moved too near edge of image'))
                 xcen[i] = -1 ; ycen[i] = -1
                 continue
 #; ---------------------------------------------------------------------
@@ -793,14 +792,14 @@ def cntrd(img, x, y, fwhm, silent=False, debug=False, extendbox = False, keepcen
         if sumxd >= 0:    # ;Reject if X derivative not decreasing
 
             if not silent:
-                print('Unable to compute X centroid around position '+ pos)
+                print(('Unable to compute X centroid around position '+ pos))
                 xcen[i]=-1 ; ycen[i]=-1
                 continue
 
         dx = sumxsq*sumd/(sumc*sumxd)
         if ( np.abs(dx) > nhalf ):    #Reject if centroid outside box
             if not silent:
-                print('Computed X centroid for position '+ pos + ' out of range')
+                print(('Computed X centroid for position '+ pos + ' out of range'))
                 xcen[i]=-1 ; ycen[i]=-1
                 continue
 
@@ -817,14 +816,14 @@ def cntrd(img, x, y, fwhm, silent=False, debug=False, extendbox = False, keepcen
 
         if (sumxd >= 0):  #;Reject if Y derivative not decreasing
             if not silent:
-                print('Unable to compute Y centroid around position '+ pos)
+                print(('Unable to compute Y centroid around position '+ pos))
                 xcen[i] = -1 ; ycen[i] = -1
                 continue
 
         dy = sumxsq*sumd/(sumc*sumxd)
         if (np.abs(dy) > nhalf):  #Reject if computed Y centroid outside box
             if not silent:
-                print('Computed X centroid for position '+ pos + ' out of centering box.')
+                print(('Computed X centroid for position '+ pos + ' out of centering box.'))
                 xcen[i]=-1 ; ycen[i]=-1
                 continue
 

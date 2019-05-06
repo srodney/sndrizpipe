@@ -7,7 +7,6 @@
 import numpy as np
 import os
 import sys
-import exceptions
 
 def loadFilter( camfiltername, filtdir='HSTFILTERS' ):
     """ Read in a filter transmission curve.
@@ -31,7 +30,7 @@ def loadFilter( camfiltername, filtdir='HSTFILTERS' ):
         filtdir = os.path.join( thisdir, filtdir )
     filtdir = os.path.abspath(filtdir)
     if not os.path.isdir( filtdir ) :
-        raise exceptions.RuntimeError("No such directory %s"%filtdir)
+        raise RuntimeError("No such directory %s"%filtdir)
 
     camfiltername = camfiltername.upper()
     instrument = camfiltername.split('-')[0]
@@ -113,7 +112,7 @@ def camfiltername(imfile):
     elif 'FILTER' in hdr :
         namelist.append( hdr['FILTER'] )
     else :
-        raise exceptions.RuntimeError('No filter in %s header.'%imfile)
+        raise RuntimeError('No filter in %s header.'%imfile)
 
     filtername = '-'.join( namelist ).strip('-')
     return( filtername.upper() )
@@ -135,19 +134,19 @@ def mkscaledtemplate( targetfilter, imfile1, imfile2=None, outfile=None,
     Returns the names of all files generated (sci, wht, bpx)
     """
     from astropy.io import fits as pyfits
-    import imarith
+    from . import imarith
     import shutil
-    import badpix
+    from . import badpix
 
     sourcefilter1 = camfiltername( imfile1 )
     if imfile2 :
         sourcefilter2 = camfiltername( imfile2 )
         if verbose :
-            print('Scaling %s + %s to match %s'%(sourcefilter1,sourcefilter2,targetfilter))
+            print(('Scaling %s + %s to match %s'%(sourcefilter1,sourcefilter2,targetfilter)))
     else :
         sourcefilter2 = None
         if verbose :
-            print('Scaling %s to match %s'%(sourcefilter1,targetfilter))
+            print(('Scaling %s to match %s'%(sourcefilter1,targetfilter)))
 
     scalefactor = scalefactor * computeFilterScaling(
         targetfilter, sourcefilter1, source2=sourcefilter2, filtdir=filtdir)
@@ -220,8 +219,8 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     * make a composite weight mask
     """
     import os
-    import imarith
-    import badpix
+    from . import imarith
+    from . import badpix
     from astropy.io import fits as pyfits
 
     targdir = '%s.e%02i'%(targname, targepoch)
@@ -269,7 +268,7 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     outfile = os.path.join( tempdir, '%s_~%s_e%02i_reg_drc_sci.fits'%(targname, targfilter, tempepoch) )
 
     if os.path.exists( outfile ) and not clobber :
-        print("Template file %s already exists, not clobbering."%outfile)
+        print(("Template file %s already exists, not clobbering."%outfile))
         tempsci = outfile
         tempwht = tempsci.replace('sci.fits','wht.fits')
         tempbpx = tempsci.replace('sci.fits','bpx.fits')
@@ -281,7 +280,7 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
     subsci = '%s_%s_e%02i-e%02i_sub_sci.fits'%(targname, targfilter, targepoch, tempepoch)
     subsci = os.path.join( targdir, subsci )
 
-    if verbose :  print( "Making pseudo diff image %s"%subsci )
+    if verbose :  print(( "Making pseudo diff image %s"%subsci ))
     diffim = imarith.imsubtract( tempsci, targsci, outfile=subsci,
                                  clobber=clobber, verbose=verbose )
     diffwht = imarith.combine_ivm_maps( targwht, tempwht,
@@ -302,8 +301,8 @@ def doScaleSubMask( targname, targfilter, targepoch, tempfilter, tempepoch,
         os.rename(diffim, diffim_masked)
         diffbpx = None
     if verbose :
-        print("Created diff image %s, wht map %s, and bpx mask %s"%(
-            diffim_masked, diffwht, diffbpx ) )
+        print(("Created diff image %s, wht map %s, and bpx mask %s"%(
+            diffim_masked, diffwht, diffbpx ) ))
     return( diffim_masked, diffwht, diffbpx )
 
 def main():

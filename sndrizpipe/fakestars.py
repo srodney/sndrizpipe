@@ -40,5 +40,5 @@ def addtofits(fitsin, fitsout, psfmodelfile, position, fluxscale,
 
     image.writeto(fitsout, clobber=True)
     if verbose:
-        print("Wrote updated image to %s" % fitsout)
+        print(("Wrote updated image to %s" % fitsout))
     return

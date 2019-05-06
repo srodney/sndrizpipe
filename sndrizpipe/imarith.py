@@ -16,12 +16,11 @@ def immultiply( image, scalefactor, outfile=None, clobber=False, verbose=False):
     """
     import os
     from numpy import ndarray
-    import exceptions
 
     # read in the image
     if isinstance( image, str ):
         if not os.path.isfile( image ) :
-            raise exceptions.RuntimeError(
+            raise RuntimeError(
                 "The image file %s is not valid."%image )
         im1head = pyfits.getheader( image )
         im1data = pyfits.getdata( image )
@@ -30,7 +29,7 @@ def immultiply( image, scalefactor, outfile=None, clobber=False, verbose=False):
         im1data = image
         im1head = None
     else : 
-        raise  exceptions.RuntimeError("Provide a fits file name or numpy array for each image.")
+        raise  RuntimeError("Provide a fits file name or numpy array for each image.")
     
     scaledim =  scalefactor * im1data
     
@@ -55,12 +54,11 @@ def imsum( image1, image2, outfile=None, clobber=False, verbose=False):
     """
     import os
     from numpy import ndarray
-    import exceptions
 
     # read in the images
     if isinstance( image1, str ):
         if not os.path.isfile( image1 ) :
-            raise exceptions.RuntimeError(
+            raise RuntimeError(
                 "The image file %s is not valid."%image1 )
         im1head = pyfits.getheader( image1 )
         im1data = pyfits.getdata( image1 )
@@ -69,19 +67,19 @@ def imsum( image1, image2, outfile=None, clobber=False, verbose=False):
         im1data = image1
         im1head = None
     else : 
-        raise  exceptions.RuntimeError(
+        raise  RuntimeError(
             "Provide a fits file name or numpy array for each image.")
     
     if isinstance( image2, str ):
         if not os.path.isfile( image2 ) :
-            raise exceptions.RuntimeError(
+            raise RuntimeError(
                 "The image file %s is not valid."%image2 )
         im2data = pyfits.getdata( image2 )
         im1head["SRCIM2"] = (image2,"Second source image for imsum")
     elif isinstance( image2, ndarray ):
         im2data = image2
     else : 
-        raise  exceptions.RuntimeError(
+        raise  RuntimeError(
             "Provide a fits file name or numpy array for each image.")
 
 
@@ -120,24 +118,23 @@ def imsubtract( image1, image2, outfile=None,
     trimmed or extended if needed.)  
     """
     import os
-    import exceptions
 
     if debug  : import pdb; pdb.set_trace()
 
     if outfile : 
         if os.path.isfile( outfile ) and not clobber : 
-            print("%s exists. Not clobbering."%outfile)
+            print(("%s exists. Not clobbering."%outfile))
             return( outfile )
 
     # read in the images
     if not os.path.isfile( image1 ) :
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             "The image file %s is not valid."%image1 )
     im1head = pyfits.getheader( image1 )
     im1data = pyfits.getdata( image1 )
 
     if not os.path.isfile( image2 ) :
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             "The image file %s is not valid."%image2 )
     im2head = pyfits.getheader( image2 )
     im2data = pyfits.getdata( image2 )
@@ -178,7 +175,7 @@ def combine_ivm_maps( im1, im2, outfile, clobber=False, verbose=False):
 
     if os.path.exists( outfile ) :
         if not clobber :
-            print( "%s exists. Not clobbering."%outfile)
+            print(( "%s exists. Not clobbering."%outfile))
             return( outfile )
         else :
             os.remove( outfile )
@@ -220,7 +217,7 @@ def imaverage( imagelist, outfile,
         if clobber :
             os.unlink( outfile )
         else :
-            print( "%s exists. Not clobbering."%outfile )
+            print(( "%s exists. Not clobbering."%outfile ))
             return( outfile )
 
     # make empty arrays for components of the weighted average
@@ -231,7 +228,7 @@ def imaverage( imagelist, outfile,
 
     # construct the weighted average and update header keywords
     outhdr = pyfits.getheader( imagelist[0] )
-    for imfilenum, imfile in zip(range(1, len(imagelist) + 1), imagelist):
+    for imfilenum, imfile in zip(list(range(1, len(imagelist) + 1)), imagelist):
         imdat = pyfits.getdata(imfile)
         sumarray += imdat
         ncombinearray += where( imdat != 0 , ones(imdat.shape), zeros(imdat.shape) )
@@ -268,14 +265,14 @@ def imweightedaverage( imagelist, whtlist, outfile, outwht,
         if clobber :
             os.unlink( outfile )
         else :
-            print( "%s exists. Not clobbering."%outfile )
+            print(( "%s exists. Not clobbering."%outfile ))
             return( outfile, outwht )
 
     if os.path.exists(outwht)  :
         if clobber :
             os.unlink( outwht )
         else :
-            print( "%s exists. Not clobbering."%outwht )
+            print(( "%s exists. Not clobbering."%outwht ))
             return( outfile, outwht )
 
     # make empty arrays for components of the weighted average
@@ -288,7 +285,7 @@ def imweightedaverage( imagelist, whtlist, outfile, outwht,
     # construct the weighted average and update header keywords
     outhdr = pyfits.getheader( imagelist[0] )
     # import pdb; pdb.set_trace()
-    for imfilenum, imfile, whtfile in zip(range(1, len(imagelist) + 1),
+    for imfilenum, imfile, whtfile in zip(list(range(1, len(imagelist) + 1)),
                                           imagelist, whtlist):
         imdat = pyfits.getdata(imfile)
         whtdat = pyfits.getdata(whtfile)
@@ -354,7 +351,7 @@ def main():
     if argv.combinetype == 'mean':
         outfile = imaverage(argv.imagelist, argv.outfile, clobber=argv.clobber,
                             verbose=argv.verbose)
-        print('created %s'%outfile)
+        print(('created %s'%outfile))
 
 
 if __name__ == "__main__":

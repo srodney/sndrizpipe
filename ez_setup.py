@@ -27,8 +27,8 @@ try:
     from urllib.request import urlopen
     from urllib.parse import urljoin
 except ImportError:
-    from urllib2 import urlopen
-    from urlparse import urljoin
+    from urllib.request import urlopen
+    from urllib.parse import urljoin
 
 try:
     from site import USER_SITE

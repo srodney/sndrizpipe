@@ -10,12 +10,12 @@ def writeDS9reg( catalog, regfile, color='green', shape='diamond',
     from astropy import units as u
     from astropy.io import ascii
 
-    if isinstance(catalog,basestring) :
+    if isinstance(catalog,str) :
         catalog = ascii.read( catalog )
 
     fout = open(regfile,'w')
-    print>>fout,"# Region file format: DS9 version 5.4"
-    print>>fout,'global color=%s font="times 16 bold" select=1 edit=1 move=0 delete=1 include=1 fixed=0 width=%i'%(color,linewidth)
+    print("# Region file format: DS9 version 5.4", file=fout)
+    print('global color=%s font="times 16 bold" select=1 edit=1 move=0 delete=1 include=1 fixed=0 width=%i'%(color,linewidth), file=fout)
 
     for row in catalog :
         RA = row['RA']
@@ -27,7 +27,7 @@ def writeDS9reg( catalog, regfile, color='green', shape='diamond',
 
         xstr  = coord.ra.to_string( unit=u.hour,decimal=False, pad=True,sep=':', precision=2 )
         ystr  = coord.dec.to_string( unit=u.degree, decimal=False, pad=True, alwayssign=True, sep=':', precision=1 )
-        print>>fout,'point  %s  %s  # point=%s'%( xstr, ystr, shape )
+        print('point  %s  %s  # point=%s'%( xstr, ystr, shape ), file=fout)
     fout.close()
 
 def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
@@ -46,15 +46,14 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
     import os
     from astropy.io import ascii
     from astropy import table
-    import exceptions
     import numpy as np
     incat = ascii.read( incatfile )
 
     if os.path.exists( refcatfile ) and not clobber :
-        print("Tweakreg reference catalog %s exists. Not clobbering."%refcatfile)
+        print(("Tweakreg reference catalog %s exists. Not clobbering."%refcatfile))
         return
     if verbose :
-        print("Converting input catalog %s into tweakreg ref cat %s"%(incatfile, refcatfile))
+        print(("Converting input catalog %s into tweakreg ref cat %s"%(incatfile, refcatfile)))
 
     gotracol = False
     for racol in ['X_WORLD','RA','ra','R.A.','ALPHA_J2000','ALPHA', 'Ra']:
@@ -67,19 +66,19 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
             gotdeccol = True
             break
     if not (gotracol and gotdeccol) :
-        raise exceptions.RuntimeError(
+        raise RuntimeError(
             "Can't read RA, Dec columns from catalog %s"%incatfile )
 
 
     if fluxcol :
         if fluxcol not in incat.colnames :
-            raise exceptions.RuntimeError(
+            raise RuntimeError(
                 "There is no column %s in %s."%(fluxcol, incatfile) )
         savecolnames = [racol,deccol,fluxcol]
         outcolnames = ['RA','DEC','FLUX']
     elif magcol :
         if magcol not in incat.colnames :
-            raise exceptions.RuntimeError(
+            raise RuntimeError(
                 "There is no column %s in %s."%(magcol, incatfile) )
         savecolnames = [racol,deccol,magcol]
         # convert from mags to flux using an arbitrary zpt = 25
@@ -94,7 +93,7 @@ def convertToRefcat( incatfile, refcatfile, fluxcol=None, magcol=None,
     outcat = table.Table( data= outcoldat, names=outcolnames )
 
     if trimctr and trimrad :
-        if verbose : print('Trimming to %.1f arcsec around %s'%(trimrad,trimctr))
+        if verbose : print(('Trimming to %.1f arcsec around %s'%(trimrad,trimctr)))
         trimra,trimdec = trimctr.split(',')
         outcat = trimcat( outcat, float(trimra), float(trimdec), trimrad )
     outcat.write( refcatfile, format='ascii.commented_header' )

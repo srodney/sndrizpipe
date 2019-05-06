@@ -15,8 +15,8 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
     runpipeline :  run all the pipeline steps
 
     """
-    import sndrizpipe
-    import urllib2
+    from . import sndrizpipe
+    import urllib.request, urllib.error, urllib.parse
     import os
     import sys
     import time
@@ -38,21 +38,21 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
         # TODO : check if flt downloads work after April, 2014
 
         # create a password manager
-        password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
 
         # Add the username and password.
         # If we knew the realm, we could use it instead of None.
         top_level_url = "HTTP://WWW.CADC-CCDA.HIA-IHA.NRC-CNRC.GC.CA/DATA/PUB/HSTCA/"
         password_mgr.add_password(None, top_level_url, username, password)
 
-        handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+        handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
 
         # create "opener" (OpenerDirector instance)
-        opener = urllib2.build_opener(handler)
+        opener = urllib.request.build_opener(handler)
 
         # Install the opener.
         # Now all calls to urllib2.urlopen use our opener.
-        urllib2.install_opener(opener)
+        urllib.request.install_opener(opener)
 
         # Go and fetch all the flt files:
         fltlist = ['IBTM7MLDQ_FLT','IBTM7MLGQ_FLT','IBTMADMJQ_FLT',
@@ -63,7 +63,7 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
 
         for fltroot in fltlist :
             url = 'HTTP://WWW.CADC-CCDA.HIA-IHA.NRC-CNRC.GC.CA/DATA/PUB/HSTCA/'
-            flt = urllib2.urlopen(url+fltroot)
+            flt = urllib.request.urlopen(url+fltroot)
 
 
     if runpipeline :
@@ -75,6 +75,6 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
                             clobber=False, verbose=True, debug=False )
 
     end = time.time()
-    print( "SNDRIZPIPE : colfax test completed in %.2f min"%((end-start)/60.) )
+    print(( "SNDRIZPIPE : colfax test completed in %.2f min"%((end-start)/60.) ))
     return 0
 

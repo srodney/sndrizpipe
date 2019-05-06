@@ -168,7 +168,7 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
             if clobber :
                 os.remove( outfile )
             else :
-                print("%s exists. Not clobbering."%outfile)
+                print(("%s exists. Not clobbering."%outfile))
                 return(outfile)
         fout = open( outfile, 'a' )
 
@@ -182,7 +182,7 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
 
 
     if outfile:
-        print >> fout, header
+        print(header, file=fout)
     if verbose :
         print(header)
     thisepoch = explist[0].epoch
@@ -193,12 +193,12 @@ def print_epochs( explist, outfile=None, verbose=True, clobber=False, onlyfilter
             continue
         if exp.epoch!=thisepoch:
             print("")
-            if outfile: print>>fout,""
+            if outfile: print("", file=fout)
             thisepoch = exp.epoch
         if outfile :
-            print >>fout, exp.summaryline_short
+            print(exp.summaryline_short, file=fout)
         if verbose :
-            print( exp.summaryline_short )
+            print(( exp.summaryline_short ))
     if outfile :
         fout.close()
 
@@ -236,13 +236,13 @@ def copy_to_epochdirs( explist,  onlyfilters=[], onlyepochs=[],
                                     os.path.basename(exp.filename) )
         if clobber :
             if verbose:
-                print( "Wiping away existing flt file %s"%newfilename)
+                print(( "Wiping away existing flt file %s"%newfilename))
             if os.path.exists( newfilename ):
                 os.remove( newfilename )
         if os.path.exists(newfilename) :
-            if verbose : print("Not copying %s. File exists."%(newfilename) )
+            if verbose : print(("Not copying %s. File exists."%(newfilename) ))
         else :
-            if verbose : print("Copying %s ==> %s"%(exp.filename, exp.epochdir) )
+            if verbose : print(("Copying %s ==> %s"%(exp.filename, exp.epochdir) ))
             shutil.copy( exp.filepath, newfilename )
             os.chmod( newfilename, PERMISSIONS )
 
@@ -281,8 +281,8 @@ def checkonimage(exp,checkradec, buffer=0, verbose=False, debug=False):
         break
 
     if verbose and not onimage :
-        print("Source RA,Dec is off image %s."%(exp.filename))
-        if darcsec>=0 : print("Distance from source to image target = %.3f arcsec"%darcsec)
+        print(("Source RA,Dec is off image %s."%(exp.filename)))
+        if darcsec>=0 : print(("Distance from source to image target = %.3f arcsec"%darcsec))
     return( onimage, darcsec )
 
 
@@ -458,7 +458,7 @@ class Exposure( object ):
             self.dither = self.header['PATTSTEP']
 
         self.crsplit = 0
-        if 'CRSPLIT' in self.header.keys():
+        if 'CRSPLIT' in list(self.header.keys()):
             if self.header['CRSPLIT'] == 2 :
                 if self.header['SHUTRPOS'] == 'A' :
                     self.crsplit = 1
@@ -494,7 +494,7 @@ class Exposure( object ):
                 try :
                     onimage,darcsec = checkonimage(self,targetradec,buffer=buffer)
                 except :
-                    print("Problem determining position relative to image %s "%self.rootname)
+                    print(("Problem determining position relative to image %s "%self.rootname))
                     # import pdb; pdb.set_trace()
                     onimage, darcsec = True, -99
                 if not onimage :
