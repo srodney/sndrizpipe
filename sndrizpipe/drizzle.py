@@ -41,7 +41,7 @@ def hotpixPostargClean( flt1, flt2, verbose=False ):
         ncr1 = len( np.where( np.ravel(crflags1) )[0] )
         ncr2 = len( np.where( np.ravel(crflags2) )[0] )
         nhotpix = len( np.where( np.ravel(hotpixflags) )[0] )
-        print(( "Removed (%i,%i) CR flags, and re-flagged %i as hot pixels"%(ncr1,ncr2,nhotpix) ))
+        print("Removed (%i,%i) CR flags, and re-flagged %i as hot pixels"%(ncr1,ncr2,nhotpix))
 
     im1.flush()
     im1.close()
@@ -89,7 +89,7 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
     instrument = hdr['INSTRUME']
     detector = hdr['DETECTOR']
     drizpar = getdrizpar( instrument, detector, nexposures=len(fltlist))
-    if verbose : print(("Drizzling %i flts to make %s."%(len(fltlist),outroot)))
+    if verbose : print("Drizzling %i flts to make %s."%(len(fltlist),outroot))
     if driz_cr<0 or (driz_cr and docombine):
         resetbits = 0
     else:

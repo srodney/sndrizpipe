@@ -22,6 +22,7 @@ section 7.5 of the drizzlepac handbook:
 
 import glob
 import os
+import shutil
 import stat
 import numpy as np
 from sndrizpipe import register
@@ -29,10 +30,13 @@ from sndrizpipe import exposures
 from sndrizpipe import drizzle
 from sndrizpipe import badpix
 from sndrizpipe import imarith
+from astropy.io import fits as pyfits
+from drizzlepac.tweakback import tweakback
+from sndrizpipe import pseudodiff
 
 # file permissions for chmod ug+rw o+r
-PERMISSIONS = (stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP |
-               stat.S_IWGRP | stat.S_IROTH)
+PERMISSIONS = (
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
 
 
 def multipipe():
@@ -52,54 +56,38 @@ def multipipe():
 # TODO : write a log file, recording user settings and results
 def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             # combine together multiple bands
-            combinefilterdict={'method':None},
-            # Run all the processing steps
-            doall=False,
-            # Setup : copy flts into sub-directories
-            dosetup=False, epochlistfile=None,
-            # construct a ref image
-            dorefim=False,
-            # Single Visit tweakreg/drizzle pass :
+            combinefilterdict={'method': None}, # Run all the processing steps
+            doall=False, # Setup : copy flts into sub-directories
+            dosetup=False, epochlistfile=None, # construct a ref image
+            dorefim=False, # Single Visit tweakreg/drizzle pass :
             dodriz1=False, drizcr=1, intravisitreg=False,
             # Register to a given image or  epoch, visit and filter
-            doreg=False, singlestar=False,
-            refim=None, refepoch=None, refvisit=None, reffilter=None,
+            doreg=False, singlestar=False, refim=None, refepoch=None,
+            refvisit=None, reffilter=None,
             # Drizzle registered flts by epoch and filter
-            dodriz2=False, singlesci=False,
-            # make diff images
+            dodriz2=False, singlesci=False, # make diff images
             dodiff=False, tempepoch=0, tempfilters=None, singlesubs=False,
             # make multi-epoch stack images
-            dostack=False,
-            # source detection and matching
-            interactive=False, threshold=5, nbright=None,
-            peakmin=None, peakmax=None,  # fluxmin=None, fluxmax=None,
+            dostack=False, # source detection and matching
+            interactive=False, threshold=5, nbright=None, peakmin=None,
+            peakmax=None,  # fluxmin=None, fluxmax=None,
             searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
             refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
-            nclip=3, sigmaclip=3.0, drizcrsnr='5,4.5',
-            shiftonly=False, ra=None, dec=None, rot=0,
-            imsize_arcsec=None, naxis12=None,
-            pixscale=None, pixfrac=None, wht_type='IVM',
-            stackepochs=None, stacktemplate=False,
-            stackpixscale=None, stackpixfrac=None,
+            nclip=3, sigmaclip=3.0, drizcrsnr='5,4.5', shiftonly=False,
+            ra=None, dec=None, rot=0, imsize_arcsec=None, naxis12=None,
+            pixscale=None, pixfrac=None, wht_type='IVM', stackepochs=None,
+            stacktemplate=False, stackpixscale=None, stackpixfrac=None,
             clean=False, clobber=False, verbose=True, debug=False):
     """ 
     Primary pipeline function.  Executes all the intermediate steps: 
        register, sort, drizzle, subtract, mask
     """
-    from astropy.io import fits as pyfits
-    import shutil
-    if debug:
-        import pdb
-        pdb.set_trace()
-    from drizzlepac.tweakback import tweakback
-    from pseudodiff import mkscaledtemplate, camfiltername
 
     # Check for logically incompatible parameters
     if nbright and minobj and (nbright < minobj - 1):
-        raise RuntimeError(
-            ' nbright < minobj \n'
-            'You have nbright=%i and minobj=%i\n' % (nbright, minobj) +
-            "That doesn't work.")
+        raise RuntimeError(' nbright < minobj \n'
+                           'You have nbright=%i and minobj=%i\n' % (
+                           nbright, minobj) + "That doesn't work.")
     if shiftonly:
         fitgeometry = 'shift'
     else:
@@ -107,9 +95,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     if fitgeometry == 'rscale' and ((nbright and nbright < 3) or minobj < 3):
         raise RuntimeError(
             ' Not requiring enough stars for rotation+scale fit.\n'
-            'You have nbright=%i and minobj=%i\n' % (nbright, minobj) +
-            "and you also have fitgeometry='rscale'."
-            "Try again with --shiftonly")
+            'You have nbright=%i and minobj=%i\n' % (
+            nbright, minobj) + "and you also have fitgeometry='rscale'."
+                               "Try again with --shiftonly")
     if onlyfilters:
         if type(onlyfilters) == str:
             onlyfilters = onlyfilters.lower().split(',')
@@ -168,25 +156,23 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         epochlistfile = "%s_epochs.txt" % outroot
     fltlist = glob.glob("%s/*fl?.fits" % fltdir)
     if not len(fltlist):
-        raise RuntimeError(
-            "There are no flt/flc/flm files in %s !!" % fltdir)
+        raise RuntimeError("There are no flt/flc/flm files in %s !!" % fltdir)
 
     if os.path.exists(epochlistfile):
-        explist_all = exposures.read_explist(
-            epochlistfile, combinefilterdict=combinefilterdict)
+        explist_all = exposures.read_explist(epochlistfile,
+            combinefilterdict=combinefilterdict)
         if verbose:
             print("%s exists. Adopting existing exposure list and "
                   "epoch sorting." % epochlistfile)
-            exposures.print_epochs(explist_all, outfile=None,
-                                   verbose=verbose, clobber=False,
-                                   onlyfilters=None, onlyepochs=None)
+            exposures.print_epochs(explist_all, outfile=None, verbose=verbose,
+                                   clobber=False, onlyfilters=None,
+                                   onlyepochs=None)
     else:
         if verbose:
             print("Generating exposure list and epoch sorting "
                   "from %s/*fl?.fits." % fltdir)
-        explist_all = exposures.get_explist(
-            fltlist, outroot=outroot, targetradec=[ra, dec],
-            combinefilterdict=combinefilterdict)
+        explist_all = exposures.get_explist(fltlist, outroot=outroot,
+            targetradec=[ra, dec], combinefilterdict=combinefilterdict)
         exposures.define_epochs(explist_all, epochspan=epochspan,
                                 mjdmin=mjdmin, mjdmax=mjdmax)
         exposures.print_epochs(explist_all, outfile=epochlistfile,
@@ -200,10 +186,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         else:
             print("Updating %s with new flt files detected in %s" % (
                 epochlistfile, fltdir))
-            explist_all = exposures.update_epochs(
-                explist_all, fltlist, epochspan=epochspan,
-                mjdmin=mjdmin, mjdmax=mjdmax, targetradec=[ra, dec],
-                combinefilterdict=combinefilterdict)
+            explist_all = exposures.update_epochs(explist_all, fltlist,
+                epochspan=epochspan, mjdmin=mjdmin, mjdmax=mjdmax,
+                targetradec=[ra, dec], combinefilterdict=combinefilterdict)
             exposures.print_epochs(explist_all, outfile=epochlistfile,
                                    verbose=verbose, clobber=clobber,
                                    onlyfilters=None, onlyepochs=None)
@@ -239,10 +224,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
     if dosetup:
         if verbose:
             print("sndrizpipe : (1) SETUP : copying flt files into subdirs")
-        exposures.copy_to_epochdirs(explist,
-                                    onlyfilters=onlyfilters,
-                                    onlyepochs=onlyepochs,
-                                    verbose=verbose, clobber=clobber)
+        exposures.copy_to_epochdirs(explist, onlyfilters=onlyfilters,
+                                    onlyepochs=onlyepochs, verbose=verbose,
+                                    clobber=clobber)
 
     FEVgrouplist = sorted(np.unique([exp.FEVgroup for exp in explist]))
     FEgrouplist = sorted(np.unique([exp.FEgroup for exp in explist]))
@@ -280,38 +264,36 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             if not refepoch:
                 refepoch = np.min(epochlist)
             if not reffilter:
-                reffilter = sorted([exp.filter for exp in explist
-                                    if exp.epoch == refepoch])[0]
+                reffilter = sorted(
+                    [exp.filter for exp in explist if exp.epoch == refepoch])[
+                    0]
             reffilter = reffilter.lower()
 
             # if refvisit is not set, use the visit with the most exposures
             if not refvisit:
                 # visits, exp_times, visit_depth = np.array( ([], [], []) )
-                explistRIvisfind = [exp for exp in explist_all
-                                    if (exp.epoch == refepoch and
-                                        exp.filter == reffilter)]
+                explistRIvisfind = [exp for exp in explist_all if (
+                            exp.epoch == refepoch and exp.filter == reffilter)]
                 pidvisits = [exp.pidvisit for exp in explistRIvisfind]
                 unique_visits = np.unique(pidvisits)
                 if len(unique_visits) == 1:
                     refvisit = unique_visits[0]
                 elif len(unique_visits) < 1:
                     raise RuntimeError(
-                        "No visits satisfy the refimage requirements:\n" +
-                        "  filter = %s     epoch = %s" % (reffilter, refepoch))
+                        "No visits satisfy the refimage requirements:\n" + "  filter = %s     epoch = %s" % (
+                        reffilter, refepoch))
                 else:
                     Nexp_per_visit = [
-                        len(np.where(np.char.equal(pidvisits, vis))[0])
-                        for vis in unique_visits]
+                        len(np.where(np.char.equal(pidvisits, vis))[0]) for vis
+                        in unique_visits]
                     ideepest = np.argmax(Nexp_per_visit)
                     refvisit = unique_visits[ideepest]
             refvisit = refvisit.upper()
             if refvisit.find('.') > 0:
                 refvisit = refvisit.replace('.', '_')
 
-            explistRI = sorted([exp for exp in explist_all
-                                if exp.epoch == refepoch and
-                                exp.filter == reffilter and
-                                exp.pidvisit == refvisit])
+            explistRI = sorted([exp for exp in explist_all if
+                                exp.epoch == refepoch and exp.filter == reffilter and exp.pidvisit == refvisit])
             if len(explistRI) < 1:
                 raise RuntimeError(
                     "Error : not enough exposures for refim with"
@@ -336,9 +318,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             # drizzle the ref image using firstDrizzle :
             # (full frame, native rotation, auto-selecting the optimal
             # pixscale and pixfrac based on number of flts)
-            refdrzsci, refimwht = drizzle.firstDrizzle(
-                fltlistRI, refimroot, driz_cr=drizcr, driz_cr_snr=drizcrsnr,
-                clean=clean)
+            refdrzsci, refimwht = drizzle.firstDrizzle(fltlistRI, refimroot,
+                driz_cr=drizcr, driz_cr_snr=drizcrsnr, clean=clean)
             refim = os.path.join(os.path.abspath(refdrzdir),
                                  os.path.basename(refdrzsci))
 
@@ -348,17 +329,15 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 if verbose:
                     print(" Registering reference image"
                           " %s to ref catalog %s" % (refdrzsci, refcat))
-                wcsname = register.RunTweakReg(
-                    refdrzsci, refim=refim, refcat=refcat,
+                wcsname = register.RunTweakReg(refdrzsci, refim=refim,
+                    refcat=refcat,
                     wcsname='REFCAT:%s' % os.path.basename(refcat),
-                    searchrad=searchrad,
-                    refnbright=refnbright, rmaxflux=rfluxmax,
-                    rminflux=rfluxmin, peakmin=peakmin, peakmax=peakmax,
-                    # fluxmin=fluxmin, fluxmax=fluxmax,
-                    fitgeometry=fitgeometry,
-                    threshold=threshold, minobj=minobj,
-                    nbright=nbright, nclip=nclip, sigmaclip=sigmaclip,
-                    clean=clean, verbose=verbose,
+                    searchrad=searchrad, refnbright=refnbright,
+                    rmaxflux=rfluxmax, rminflux=rfluxmin, peakmin=peakmin,
+                    peakmax=peakmax, # fluxmin=fluxmin, fluxmax=fluxmax,
+                    fitgeometry=fitgeometry, threshold=threshold,
+                    minobj=minobj, nbright=nbright, nclip=nclip,
+                    sigmaclip=sigmaclip, clean=clean, verbose=verbose,
                     interactive=interactive, clobber=clobber, debug=debug)
 
             if clean:
@@ -384,8 +363,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         assert (os.path.exists(refim))
         refdrzdir = os.path.dirname(refim)
         os.chdir(refdrzdir)
-        refcatfile = register.mkSourceCatalog(
-            os.path.basename(refim), threshold=threshold,
+        refcatfile = \
+        register.mkSourceCatalog(os.path.basename(refim), threshold=threshold,
             peakmin=peakmin, peakmax=peakmax)[0]
         os.chdir(topdir)
         refcat = os.path.abspath(os.path.join(refdrzdir, refcatfile))
@@ -423,20 +402,18 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 continue
             if intravisitreg:
                 # run tweakreg for intravisit registration tweaks
-                wcsname = register.RunTweakReg(
-                    fltlistFEV, wcsname='INTRAVIS', refcat=refcat,
-                    searchrad=searchrad, threshold=threshold, minobj=minobj,
-                    peakmin=peakmin, peakmax=peakmax,
+                wcsname = register.RunTweakReg(fltlistFEV, wcsname='INTRAVIS',
+                    refcat=refcat, searchrad=searchrad, threshold=threshold,
+                    minobj=minobj, peakmin=peakmin, peakmax=peakmax,
                     # fluxmin=fluxmin, fluxmax=fluxmax,
                     fitgeometry=fitgeometry, nbright=nbright, clean=clean,
                     refnbright=refnbright, nclip=nclip, sigmaclip=sigmaclip,
-                    rminflux=rfluxmin, rmaxflux=rfluxmax,
-                    verbose=verbose, interactive=interactive, clobber=clobber,
-                    debug=debug)
-            drizzle.firstDrizzle(
-                fltlistFEV, outrootFEV, driz_cr=drizcr, driz_cr_snr=drizcrsnr,
-                wcskey=((intravisitreg and 'INTRAVIS') or ''),
-                clobber=clobber, verbose=verbose, clean=clean)
+                    rminflux=rfluxmin, rmaxflux=rfluxmax, verbose=verbose,
+                    interactive=interactive, clobber=clobber, debug=debug)
+            drizzle.firstDrizzle(fltlistFEV, outrootFEV, driz_cr=drizcr,
+                driz_cr_snr=drizcrsnr,
+                wcskey=((intravisitreg and 'INTRAVIS') or ''), clobber=clobber,
+                verbose=verbose, clean=clean)
             # Be extra careful with CR flags when we only have 2 IR exposures
             # the hotpix function below will remove any CR flags that don't
             # appear in both exposures, leaving only those that are very
@@ -502,24 +479,22 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
 
             if singlestar:
                 # Special case for handling standard star images:
-                wcsname = register.SingleStarReg(
-                    outsciFEV, ra, dec, refim=None, threshmin=threshold,
-                    peakmin=peakmin, peakmax=peakmax, searchrad=searchrad,
+                wcsname = register.SingleStarReg(outsciFEV, ra, dec,
+                    refim=None, threshmin=threshold, peakmin=peakmin,
+                    peakmax=peakmax, searchrad=searchrad,
                     wcsname='SINGLESTAR:%.6f,%.6f' % (ra, dec),
                     verbose=verbose)
 
             else:
                 # register to the ref image and ref catalog
-                wcsname = register.RunTweakReg(
-                    outsciFEV, wcsname='REFIM:%s' % os.path.basename(refim),
-                    refim=refim, refcat=refcat,
-                    searchrad=searchrad, threshold=threshold, minobj=minobj,
-                    peakmin=peakmin, peakmax=peakmax,
+                wcsname = register.RunTweakReg(outsciFEV,
+                    wcsname='REFIM:%s' % os.path.basename(refim), refim=refim,
+                    refcat=refcat, searchrad=searchrad, threshold=threshold,
+                    minobj=minobj, peakmin=peakmin, peakmax=peakmax,
                     # fluxmin=fluxmin, fluxmax=fluxmax,
                     fitgeometry=fitgeometry, nbright=nbright, clean=clean,
                     refnbright=refnbright, rminflux=rfluxmin,
-                    rmaxflux=rfluxmax,
-                    nclip=nclip, sigmaclip=sigmaclip,
+                    rmaxflux=rfluxmax, nclip=nclip, sigmaclip=sigmaclip,
                     verbose=verbose, interactive=interactive, clobber=clobber,
                     debug=debug)
 
@@ -577,28 +552,24 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                 fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec, rot=rot,
                 imsize_arcsec=imsize_arcsec, naxis12=naxis12,
-                wht_type=wht_type,
-                pixscale=pixscale, pixfrac=pixfrac, combine_type=combine_type,
-                driz_cr=(drizcr > 1), driz_cr_snr=drizcrsnr,
-                singlesci=(singlesubs or singlesci), clean=clean,
-                clobber=clobber, verbose=verbose, debug=debug)
+                wht_type=wht_type, pixscale=pixscale, pixfrac=pixfrac,
+                combine_type=combine_type, driz_cr=(drizcr > 1),
+                driz_cr_snr=drizcrsnr, singlesci=(singlesubs or singlesci),
+                clean=clean, clobber=clobber, verbose=verbose, debug=debug)
 
             # As above, be extra careful with CR flagging when we
             # only have 2 IR exposures
-            if (drizcr > 1 and len(fltlistFE) == 2 and
-                    explistFE[0].camera == 'WFC3-IR'):
+            if (drizcr > 1 and len(fltlistFE) == 2 and explistFE[
+                0].camera == 'WFC3-IR'):
                 drizzle.hotpixPostargClean(fltlistFE[0], fltlistFE[1],
                                            verbose=verbose)
                 outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
                     fltlistFE, outrootFE, refimage=None, ra=ra, dec=dec,
-                    rot=rot,
-                    imsize_arcsec=imsize_arcsec, naxis12=naxis12,
-                    wht_type=wht_type,
-                    pixscale=pixscale, pixfrac=pixfrac,
-                    combine_type=combine_type,
-                    driz_cr=False, driz_cr_snr=drizcrsnr,
-                    singlesci=(singlesubs or singlesci), clean=clean,
-                    clobber=True, verbose=verbose, debug=debug)
+                    rot=rot, imsize_arcsec=imsize_arcsec, naxis12=naxis12,
+                    wht_type=wht_type, pixscale=pixscale, pixfrac=pixfrac,
+                    combine_type=combine_type, driz_cr=False,
+                    driz_cr_snr=drizcrsnr, singlesci=(singlesubs or singlesci),
+                    clean=clean, clobber=True, verbose=verbose, debug=debug)
 
             os.chdir(topdir)
 
@@ -617,11 +588,11 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                     continue
                 if epoch == tempepoch:
                     continue
-                if ((combinefilterdict['method'] == 'driz') and
-                        (filter in combinefilterdict['filterlist'])):
+                if ((combinefilterdict['method'] == 'driz') and (
+                        filter in combinefilterdict['filterlist'])):
                     explistFE = [exp for exp in explist if
-                                 filter in combinefilterdict['filterlist'] and
-                                 exp.epoch == epoch]
+                                 filter in combinefilterdict[
+                                     'filterlist'] and exp.epoch == epoch]
                 else:
                     explistFE = [exp for exp in explist if
                                  exp.filter == filter and exp.epoch == epoch]
@@ -657,17 +628,16 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                     tempsci1 = os.path.join(tempdir,
                                             '%s_%s_e%02i_reg_%s_sci.fits' % (
                                                 outroot, tempfilter1,
-                                                tempepoch,
-                                                drzsuffix))
+                                                tempepoch, drzsuffix))
                     if ',' in tempfilters:
                         tempfilter2 = tempfilters.split(',')[1]
-                        tempsci2 = os.path.join(
-                            tempdir, '%s_%s_e%02i_reg_%s_sci.fits' % (
+                        tempsci2 = os.path.join(tempdir,
+                            '%s_%s_e%02i_reg_%s_sci.fits' % (
                                 outroot, tempfilter2, tempepoch, drzsuffix))
                     else:
                         tempfilter2, tempsci2 = None, None
-                    targetfilter = camfiltername(regsci)
-                    tempsci, tempwht, tempbpx = mkscaledtemplate(
+                    targetfilter = pseudodiff.camfiltername(regsci)
+                    tempsci, tempwht, tempbpx = pseudodiff.mkscaledtemplate(
                         targetfilter, tempsci1, tempsci2, outfile=tempsci,
                         filtdir='HSTFILTERS', verbose=verbose, clobber=clobber)
                 tempwht = tempsci.replace('sci.fits', 'wht.fits')
@@ -718,15 +688,16 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                         os.remove(diffim)
                     print("Created diff image %s using reg_sci image %s, "
                           "template %s, wht map %s, and bpx mask %s" % (
-                          diffim_masked, regsci, tempsci, diffwht, diffbpx))
-                    if ((combinefilterdict['method'] == 'avg') and
-                            (filter in combinefilterdict['filterlist'])):
+                              diffim_masked, regsci, tempsci, diffwht,
+                              diffbpx))
+                    if ((combinefilterdict['method'] == 'avg') and (
+                            filter in combinefilterdict['filterlist'])):
                         diffimfile = os.path.abspath(diffim_masked)
                         diffwhtfile = os.path.abspath(diffwht)
-                        combinefilterdict['diffimfiles'][epoch][filter] = \
-                            diffimfile
-                        combinefilterdict['diffwhtfiles'][epoch][filter] = \
-                            diffwhtfile
+                        combinefilterdict['diffimfiles'][epoch][
+                            filter] = diffimfile
+                        combinefilterdict['diffwhtfiles'][epoch][
+                            filter] = diffwhtfile
                 os.chdir(topdir)
             pass  # end for epoch in epochlist
         pass  # end for filter in filterlist
@@ -741,10 +712,10 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             if len(filterkeylist) == 0:
                 print("No suitable diff images for combination.")
                 continue
-            difflist = [combinefilterdict['diffimfiles'][epoch][f]
-                         for f in filterkeylist]
-            whtlist = [combinefilterdict['diffwhtfiles'][epoch][f]
-                       for f in filterkeylist]
+            difflist = [combinefilterdict['diffimfiles'][epoch][f] for f in
+                        filterkeylist]
+            whtlist = [combinefilterdict['diffwhtfiles'][epoch][f] for f in
+                       filterkeylist]
             outfile = difflist[0].replace(combinefilterdict['filterlist'][0],
                                           combinefilterdict['name'])
             outwht = whtlist[0].replace(combinefilterdict['filterlist'][0],
@@ -753,7 +724,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                                       clobber=clobber, verbose=verbose)
             print("Created composite diff image %s by adding together "
                   "filters %s in epoch %02i" % (
-                  outfile, ','.join(combinefilterdict['filterlist']), epoch))
+                      outfile, ','.join(combinefilterdict['filterlist']),
+                      epoch))
 
     # STAGE 7
     # Drizzle together all specified non-template epochs into a single stack
@@ -831,13 +803,12 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 stackpixfrac = pixfrac
             os.chdir(stackdir)
             outscilist, outwhtlist, outbpxlist = drizzle.secondDrizzle(
-                fltlistStack, outrootStack,
-                refimage=None, ra=ra, dec=dec, rot=rot,
-                imsize_arcsec=imsize_arcsec, wht_type=wht_type,
-                pixscale=stackpixscale, pixfrac=stackpixfrac,
-                driz_cr=drizcr, driz_cr_snr=drizcrsnr,
-                singlesci=False, clean=clean, combine_type=combine_type,
-                clobber=clobber, verbose=verbose, debug=debug)
+                fltlistStack, outrootStack, refimage=None, ra=ra, dec=dec,
+                rot=rot, imsize_arcsec=imsize_arcsec, wht_type=wht_type,
+                pixscale=stackpixscale, pixfrac=stackpixfrac, driz_cr=drizcr,
+                driz_cr_snr=drizcrsnr, singlesci=False, clean=clean,
+                combine_type=combine_type, clobber=clobber, verbose=verbose,
+                debug=debug)
 
             os.chdir(topdir)
             # make a stacked diff image (for locating SN center)
@@ -846,15 +817,14 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                                    outroot + '.e%02i' % tempepoch)
             tempsci = os.path.join(tempdir, '%s_%s_e%02i_reg_%s_sci.fits' % (
                 outroot, filter, tempepoch, drzsuffix))
-            subsciStack = os.path.join(os.path.abspath(stackdir),
-                                       (outrootStack + "-e%02i_sub_sci.fits" %
-                                        tempepoch))
+            subsciStack = os.path.join(os.path.abspath(stackdir), (
+                        outrootStack + "-e%02i_sub_sci.fits" % tempepoch))
             if os.path.isfile(tempsci):
                 print(" Making diff image from the stack %s" % outrootStack)
                 diffim = imarith.imsubtract(tempsci, outsciStack,
                                             outfile=subsciStack,
-                                            clobber=clobber,
-                                            verbose=verbose, debug=debug)
+                                            clobber=clobber, verbose=verbose,
+                                            debug=debug)
             pass  # end for filter in filterlist
 
     if clean > 1:
@@ -922,9 +892,8 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
                 os.remove(natctx)
             if clean > 3:
                 natroot = natsci.replace('.fits', '')
-                natcoolist = glob.glob(natroot + '_*.coo') + \
-                             glob.glob(natroot + '_*.match') + \
-                             glob.glob(natroot + '_*.list')
+                natcoolist = glob.glob(natroot + '_*.coo') + glob.glob(
+                    natroot + '_*.match') + glob.glob(natroot + '_*.list')
                 for natcoo in natcoolist:
                     os.remove(natcoo)
             if clean > 4:
@@ -956,14 +925,12 @@ def mkparser():
     parser = argparse.ArgumentParser(
         description='Run astrodrizzle and tweakreg on a set of flt, flc or flm'
                     'images, building single-epoch drizzled images '
-                    'and diff images.',
-        formatter_class=SmartFormatter)
+                    'and diff images.', formatter_class=SmartFormatter)
 
     # Required positional argument
-    parser.add_argument('rootname',
-                        help='Root name for the input flt dir'
-                             '(<rootname>.flt), also used for the output '
-                             '_drz products. ')
+    parser.add_argument('rootname', help='Root name for the input flt dir'
+                                         '(<rootname>.flt), also used for the output '
+                                         '_drz products. ')
 
     # optional arguments :
     parser.add_argument('--filters', metavar='X,Y,Z',
@@ -971,13 +938,13 @@ def mkparser():
                              '(comma-separated list)', default='')
     parser.add_argument('--epochs', metavar='X,Y,Z',
                         help='Process only these epochs '
-                        '(comma-separated list)', default='')
+                             '(comma-separated list)', default='')
 
     parser.add_argument('--combinefilterlist', type=str, metavar='X,Y,Z',
                         help='Combine these filters into a single image'
                              ' (comma-seperated list)', default=None)
     parser.add_argument('--combinefiltermethod', type=str,
-                        choices=['avg','driz'],
+                        choices=['avg', 'driz'],
                         help='Use a weighted average or drizzling to combine '
                              'multiple filters together', default=None)
     parser.add_argument('--combinefiltername', type=str, metavar='A',
@@ -996,8 +963,7 @@ def mkparser():
                         help='Turn off verbosity. [default is ON]',
                         default=True)
     parser.add_argument('--clean', type=int, choices=[0, 1, 2, 3, 4, 5],
-                        default=1,
-                        help=dedent("""\
+                        default=1, help=dedent("""\
                         R|Clean up cruft:
                         [0] Keep all intermediate files.
                         [1] Remove intermediate drizzle and diff files, '
@@ -1011,8 +977,7 @@ def mkparser():
                         help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true',
                         help='Process the SN Colfax test data (all other'
-                             'options ignored)',
-                        default=False)
+                             'options ignored)', default=False)
 
     parser.add_argument('--singlestar', action='store_true',
                         help='Special case for registering images with only '
@@ -1047,10 +1012,10 @@ def mkparser():
     sortpar = parser.add_argument_group("(1) Settings for epoch sorting stage")
     sortpar.add_argument('--mjdmin', metavar='0', type=float,
                          help='All observations prior to this date are put '
-                         'into epoch 0.', default=0)
+                              'into epoch 0.', default=0)
     sortpar.add_argument('--mjdmax', metavar='inf', type=float,
                          help='All observations after this date are put into '
-                         'the last epoch.', default=0)
+                              'the last epoch.', default=0)
     sortpar.add_argument('--epochspan', metavar='5', type=float,
                          help='Max number of days spanning a single epoch.',
                          default=5)
@@ -1074,8 +1039,7 @@ def mkparser():
     driz1par = parser.add_argument_group(
         "(3) Settings for astrodrizzle stage(s)")
     driz1par.add_argument('--drizcr', type=int, default=1,
-                          choices=[-1, 0, 1, 2],
-                          help=dedent("""\
+                          choices=[-1, 0, 1, 2], help=dedent("""\
 R|Astrodrizzle cosmic ray rejection stage:
 [-1] remove CR flags and don't add any more;
 [0] Keep existing CR flags and don't do any new CR rejection;
@@ -1089,16 +1053,13 @@ R|Astrodrizzle cosmic ray rejection stage:
                                        'detection and WCS registration stage')
     regpar.add_argument('--threshold', metavar='5', type=float,
                         help='Detection threshold in sigmas for tweakreg '
-                             'object detection.',
-                        default=5)
+                             'object detection.', default=5)
     regpar.add_argument('--peakmin', metavar='X', type=float,
                         help='Require peak flux above this value for tweakreg '
-                             'object detection.',
-                        default=None)
+                             'object detection.', default=None)
     regpar.add_argument('--peakmax', metavar='X', type=float,
                         help='Require peak flux below this value for tweakreg '
-                             'object detection.',
-                        default=None)
+                             'object detection.', default=None)
     regpar.add_argument('--interactive', action='store_true',
                         help='Run tweakreg interactively (showing plots)',
                         default=False)
@@ -1113,7 +1074,7 @@ R|Astrodrizzle cosmic ray rejection stage:
                              'tweakreg registration.', default=10)
     regpar.add_argument('--refcat', metavar='X.cat',
                         help='Existing source catalog for limiting '
-                        'tweakreg matches.', default='')
+                             'tweakreg matches.', default='')
     regpar.add_argument('--rfluxmin', metavar='X', type=float,
                         help='Limit the tweakreg reference catalog to objects '
                              'brighter than this magnitude.', default=None)
@@ -1212,7 +1173,7 @@ def main():
     elif argv.radec is not None:
         ra, dec = [float(x) for x in argv.radec.split(',')]
 
-    combinefilterdict = {'method':None, 'name':None, 'filterlist':None}
+    combinefilterdict = {'method': None, 'name': None, 'filterlist': None}
     if argv.combinefilterlist:
         if not argv.combinefiltername or not argv.combinefiltermethod:
             raise SyntaxError(
@@ -1223,42 +1184,37 @@ def main():
                 "--combinefilterlist F125W,F160W  --combinefiltername JH "
                 "--combinefiltermethod add")
         combinefilterdict['name'] = argv.combinefiltername
-        combinefilterdict['filterlist'] = argv.combinefilterlist.lower().split(',')
+        combinefilterdict['filterlist'] = argv.combinefilterlist.lower().split(
+            ',')
         combinefilterdict['method'] = argv.combinefiltermethod.lower()
 
     # Run the pipeline :
     runpipe(argv.rootname, onlyfilters=(argv.filters or []),
             onlyepochs=(argv.epochs or []),
-            combinefilterdict=combinefilterdict,
-            doall=argv.doall,
-            dosetup=argv.dosetup, dorefim=argv.dorefim,
-            dodriz1=argv.dodriz1, doreg=argv.doreg,
-            dodriz2=argv.dodriz2, dodiff=argv.dodiff,
-            dostack=argv.dostack,
-            drizcr=argv.drizcr, drizcrsnr=argv.drizcrsnr,
-            intravisitreg=argv.intravisitreg,
-            refim=argv.refimage, refepoch=argv.refepoch,
-            refvisit=argv.refvisit, reffilter=argv.reffilter,
-            tempepoch=argv.tempepoch, tempfilters=argv.tempfilters,
-            refcat=argv.refcat, interactive=argv.interactive,
-            peakmin=argv.peakmin, peakmax=argv.peakmax,
-            rfluxmax=argv.rfluxmin, rfluxmin=argv.rfluxmax,
-            refnbright=argv.refnbright, nbright=argv.nbright,
-            searchrad=argv.searchrad, threshold=argv.threshold,
-            nclip=argv.nclip, sigmaclip=argv.sigmaclip,
-            minobj=argv.minobj, shiftonly=argv.shiftonly,
-            singlestar=argv.singlestar,
-            mjdmin=argv.mjdmin, mjdmax=argv.mjdmax,
-            epochspan=argv.epochspan,
-            ra=ra, dec=dec, rot=argv.rot,
-            imsize_arcsec=argv.imsize, naxis12=argv.naxis12,
-            pixscale=argv.pixscale, pixfrac=argv.pixfrac,
+            combinefilterdict=combinefilterdict, doall=argv.doall,
+            dosetup=argv.dosetup, dorefim=argv.dorefim, dodriz1=argv.dodriz1,
+            doreg=argv.doreg, dodriz2=argv.dodriz2, dodiff=argv.dodiff,
+            dostack=argv.dostack, drizcr=argv.drizcr, drizcrsnr=argv.drizcrsnr,
+            intravisitreg=argv.intravisitreg, refim=argv.refimage,
+            refepoch=argv.refepoch, refvisit=argv.refvisit,
+            reffilter=argv.reffilter, tempepoch=argv.tempepoch,
+            tempfilters=argv.tempfilters, refcat=argv.refcat,
+            interactive=argv.interactive, peakmin=argv.peakmin,
+            peakmax=argv.peakmax, rfluxmax=argv.rfluxmin,
+            rfluxmin=argv.rfluxmax, refnbright=argv.refnbright,
+            nbright=argv.nbright, searchrad=argv.searchrad,
+            threshold=argv.threshold, nclip=argv.nclip,
+            sigmaclip=argv.sigmaclip, minobj=argv.minobj,
+            shiftonly=argv.shiftonly, singlestar=argv.singlestar,
+            mjdmin=argv.mjdmin, mjdmax=argv.mjdmax, epochspan=argv.epochspan,
+            ra=ra, dec=dec, rot=argv.rot, imsize_arcsec=argv.imsize,
+            naxis12=argv.naxis12, pixscale=argv.pixscale, pixfrac=argv.pixfrac,
             wht_type=argv.wht_type, clean=argv.clean,
             singlesubs=argv.singlesubs,
             singlesci=(argv.singlesci or argv.singlesubs),
-            stackepochs=argv.stackepochs,
-            stackpixscale=argv.stackpixscale, stackpixfrac=argv.stackpixfrac,
-            clobber=argv.clobber, verbose=argv.verbose, debug=argv.debug)
+            stackepochs=argv.stackepochs, stackpixscale=argv.stackpixscale,
+            stackpixfrac=argv.stackpixfrac, clobber=argv.clobber,
+            verbose=argv.verbose, debug=argv.debug)
     return 0
 
 
