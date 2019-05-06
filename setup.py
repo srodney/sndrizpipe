@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
+import ah_bootstrap
+
 import glob
 import os
 import sys
 
-import ah_bootstrap
 from setuptools import setup
 
 # A dirty hack to get around some early import/configurations ambiguities
 if sys.version_info[0] >= 3:
     import builtins
 else:
-    import __builtin__ as builtins
+    import builtins as builtins
 builtins._ASTROPY_SETUP_ = True
 
 from astropy_helpers.setup_helpers import (register_commands, get_debug_option,
@@ -22,7 +23,7 @@ from astropy_helpers.version_helpers import generate_version_py
 
 # Get some values from the setup.cfg
 try:
-    from ConfigParser import ConfigParser
+    from configparser import ConfigParser
 except ImportError:
     from configparser import ConfigParser
 
