@@ -543,3 +543,9 @@ class Exposure( object ):
         return('%9s  %5i %3s %3s %6s    %02i %7.1f %8.2f %8.2f %6.1f'%(
                 self.rootname, self.pid, self.visit, self.expid, self.filter,
                 self.epoch, self.mjd, self.exptime, self.darcsec, self.orient))
+
+    def __lt__(self, other):
+        if self.rootname < other.rootname:
+            return(True)
+        return(False)
+    
