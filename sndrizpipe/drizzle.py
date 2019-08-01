@@ -5,37 +5,39 @@ import os
 from astropy.io import fits as pyfits
 
 from stsci import tools
-from drizzlepac import tweakreg, astrodrizzle
+from drizzlepac import astrodrizzle
+import numpy as np
 
-def hotpixPostargClean( flt1, flt2, verbose=False ):
+def hotpixPostargClean(flt1, flt2, verbose=False):
     """
     Remove all CR flags from a pair of WFC3-IR flt DQ arrays except those that
     are most likely unflagged hot pixels, identified by getting a 4096 flag in
     both exposures.
 
-    :param fltlist: a list of WFC3 IR flt files from a single dither sequence
-       that already have 4096 CR flags in their DQ arrays from astrodrizzle
+    :param flt1: the first WFC3 IR flt file in a pair from a single dither
+       sequence that already have 4096 CR flags in their DQ arrays
+       from astrodrizzle
+    :param flt2: the second WFC3 IR flt file in the pair
     :return:
     """
-    import numpy as np
-    im1 = pyfits.open( flt1, mode='update' )
-    im2 = pyfits.open( flt2, mode='update' )
+    im1 = pyfits.open(flt1, mode='update')
+    im2 = pyfits.open(flt2, mode='update')
 
     dq1 = im1[3].data
     dq2 = im2[3].data
 
     crflags1 = dq1 & 4096
     crflags2 = dq2 & 4096
-    hotpixflags = ( ( crflags1 & crflags2 ) / 4096 ) * 16
+    hotpixflags = np.array(((crflags1 & crflags2) / 4096) * 16, dtype=int)
 
-    icrflags1 = np.where( crflags1 )
-    icrflags2 = np.where( crflags2 )
+    icrflags1 = np.where(crflags1)
+    icrflags2 = np.where(crflags2)
 
-    im1[3].data[ icrflags1 ] -= 4096
-    im2[3].data[ icrflags2 ] -= 4096
+    im1[3].data[icrflags1] -= 4096
+    im2[3].data[icrflags2] -= 4096
 
-    im1[3].data += hotpixflags
-    im2[3].data += hotpixflags
+    im1[3].data = np.add(im1[3].data, hotpixflags, dtype=int)
+    im2[3].data = np.add(im2[3].data, hotpixflags, dtype=int)
 
     if verbose :
         ncr1 = len( np.where( np.ravel(crflags1) )[0] )
