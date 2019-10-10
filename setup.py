@@ -99,7 +99,10 @@ package_info['package_data'].setdefault(PACKAGENAME, [])
 package_info['package_data'][PACKAGENAME].append('HSTFILTERS/*')
 
 # Define entry points for command-line scripts
-entry_points = {'console_scripts': []}
+entry_points = {'console_scripts': [
+    'sndrizpipe = sndrizpipe.runpipe_cmdline:main',
+    ],
+}
 
 entry_point_list = conf.items('entry_points')
 for entry_point in entry_point_list:
