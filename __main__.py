@@ -30,6 +30,7 @@ from sndrizpipe import exposures
 from sndrizpipe import drizzle
 from sndrizpipe import badpix
 from sndrizpipe import imarith
+from sndrizpipe import testpipe
 from astropy.io import fits as pyfits
 from drizzlepac.tweakback import tweakback
 from sndrizpipe import pseudodiff
@@ -1163,7 +1164,7 @@ def main():
     argv = parser.parse_args()
 
     if argv.dotest:
-        import testpipe
+        #import testpipe
         testpipe.colfaxtest(getflts=True, runpipeline=True)
         return 0
 

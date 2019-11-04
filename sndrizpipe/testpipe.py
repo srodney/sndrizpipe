@@ -3,6 +3,7 @@ __author__ = 'srodney'
 # TODO : add a test that uses the command-line interface
 # command-line test :
 # sndrizzle --filters F160W  --doall --mjdmin 56010 --mjdmax 56300 --ra 189.156538 --dec 62.309147  --refcat 'goodsn_mosaic.cat' colfax
+from . import runpipe_cmdline
 
 def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
     """ Test the pipeline using images of SN Colfax from CANDELS,
@@ -15,7 +16,6 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
     runpipeline :  run all the pipeline steps
 
     """
-    from . import sndrizpipe
     import urllib.request, urllib.error, urllib.parse
     import os
     import sys
@@ -29,7 +29,7 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
     thisdir = os.path.dirname( os.path.abspath( thisfile ) )
 
     if getflts :
-        tgzfile = os.path.join( thisdir, 'colfax_test.tgz' )
+        tgzfile = os.path.join( thisdir, 'sndrizpipe/colfax_test.tgz' )
         os.system( 'tar -xvzf %s'%tgzfile )
 
     if False :
@@ -67,7 +67,7 @@ def colfaxtest( getflts=True, username=None, password=None, runpipeline=True):
 
 
     if runpipeline :
-        sndrizpipe.runpipe( 'colfax', onlyfilters=['F160W'], onlyepochs=[0,1,2],
+        runpipe_cmdline.runpipe( 'colfax', onlyfilters=['F160W'], onlyepochs=[0,1,2],
                             doall=True, refcat='goodsn_mosaic.cat',
                             refepoch=1, reffilter='F160W',
                             mjdmin=56010, mjdmax=56300, epochspan=5,
