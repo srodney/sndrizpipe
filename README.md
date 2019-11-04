@@ -17,38 +17,28 @@ STScI/Gemini.
    
 http://ssb.stsci.edu/ureka/
 
-
-
 ---------
+Environment variables
+--------
 
-WFC3 UVIS CTE correction
----------
+You must set up some environment variables before running sndrizpipe, using either setenv or export or the equivalent (depending on your shell type).    Here is an example of how I've set this up in my .zshrc file: 
 
-These tools are from Jay Anderson at STScI
-
-http://www.stsci.edu/hst/wfc3/tools/cte_tools
-
-To compile, use g77 or gfortran:
-
-
-    gfortran wfc3uv_ctereverse.F -o wfc3uv_ctereverse.e`
-
-    gfortran wfc3uv_ctereverse_wSUB.F -o wfc3uv_ctereverse_wSUB.e
-
-    gfortran wfc3uv_ctereverse_parallel.F -o wfc3uv_ctereverse_parallel.e -fopenmp
+```
+# ============================================================
+#  IRAF cdbs directories : 
 
 
-The first is for full-frame, the second for sub-arrays,
-the third uses parallel processing.  To correct the CTE trails in a set of
-WFC3 UVIS images residing in the current directory,
-first collect all the `_raw.fits` and corresponding `_flt.fits` files into
-the current working directory.  Then run the CTE correction tool with:
-
-    /path/to/sndrizpipe/wfc3uv_ctereverse.e *_raw.fits FLC+
-
-The result will be a new `_flc.fits` file for each RAW+FLT input pair.  See
-the STScI link above for more details.
-
+export CDBS=$HOME/Dropbox/cdbs/
+export iref=$CDBS/iref/
+export jref=$CDBS/jref/
+export mtab=$CDBS/mtab/
+export cracscomp=$CDBS/comp/acs/
+export crotacomp=$CDBS/comp/ota/
+export crwfc3comp=$CDBS/comp/wfc3/
+export crnicmoscomp=$CDBS/comp/nicmos/
+export crrefer=$CDBS/
+export PYSYN_CDBS=$CDBS/
+```
 
 Directory Setup
 ---------
