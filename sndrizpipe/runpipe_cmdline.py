@@ -1163,7 +1163,7 @@ def main():
     argv = parser.parse_args()
 
     if argv.dotest:
-        import testpipe
+        from sndrizpipe import testpipe
         testpipe.colfaxtest(getflts=True, runpipeline=True)
         return 0
 
