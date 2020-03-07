@@ -146,3 +146,30 @@ setup(name=PACKAGENAME,
       entry_points=entry_points,
       **package_info
 )
+
+#import os
+#Apparently - we cannot set environment variables from a "child" process. 
+#print ('setting up environment variables...')
+#os.environ["iref"] = ""
+#os.environ["jref"] = ""
+#stream1 = os.popen("export iref=\"sndrizpipe_dummy\"; echo $iref ;")
+#output1 = stream1.read()
+#stream2 = os.popen("export jref=\"sndrizpipe_dummy\"; echo $jref ;")
+#output2 = stream2.read()
+#var1 = os.environ.get('iref', 'not set')
+#var2 = os.environ.get('jref', 'not set')
+#print ('iref:', output1, '<-- should be set')
+#print ('jref:', output2, '<-- should be set')
+#print ('...done setting up environment variables')
+
+
+
+
+
+
+
+
+
+
+
+

@@ -33,7 +33,6 @@ I believe the only useful commands are:
   450  pip install astropy --user
   452  pip install astroquery --user
   453  python Example_DataFindHubbleSuperNova.py
-  462  python Example_SymlinkMountHubbleSuperNova.py 
 
 
 

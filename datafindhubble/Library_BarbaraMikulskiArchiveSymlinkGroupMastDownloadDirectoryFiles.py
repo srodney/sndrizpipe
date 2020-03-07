@@ -72,7 +72,7 @@ def Main(
     #Second we need to create a directory "neighboring" the product list directory 
     #   within which to put the flat files
     DownloadDirectoryName = Library_StringFilePathGetFileName.Main(ProductListDownloadDirectory)
-    DownloadDirectoryNeighbor = os.path.dirname( ProductListDownloadDirectory ) + '/' + DownloadDirectoryName + 'FilesSymlinks'
+    DownloadDirectoryNeighbor = os.path.dirname( ProductListDownloadDirectory ) + '/' + DownloadDirectoryName + 'FilesSymlinks.flt'
     DownloadDirectoryNeighbor = os.path.realpath(DownloadDirectoryNeighbor)
     Library_SystemDirectoryCreateSafe.Main(DownloadDirectoryNeighbor)
 
@@ -80,6 +80,7 @@ def Main(
 
     #Third create the list of symlinks in the "neighbor" directory
     for FitsFilePath in FitsFilePaths:
+        FitsFilePath = os.path.realpath(FitsFilePath)
         FitsFileName = Library_StringFilePathGetFileName.Main(FitsFilePath)
         SymlinkFilePath = DownloadDirectoryNeighbor + '/' + FitsFileName
 

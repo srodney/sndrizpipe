@@ -127,9 +127,9 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         dosetup = True
         dorefim = True
         dodriz1 = True
-        doreg = True
+        doreg   = True
         dodriz2 = True
-        dodiff = True
+        dodiff  = True
         # Note: we don't set dostack = True with doall, so you have to use
         #  --dostack to get a stacked image
 
@@ -156,9 +156,13 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
         epochlistfile = "%s_epochs.txt" % outroot
     fltlist = glob.glob("%s/*fl?.fits" % fltdir)
     if not len(fltlist):
+        print ('\n\n')
+        print ('fltlist')
+        print (fltlist)
         raise RuntimeError("There are no flt/flc/flm files in %s !!" % fltdir)
 
     if os.path.exists(epochlistfile):
+        print ('epochlistfile', epochlistfile)
         explist_all = exposures.read_explist(epochlistfile,
             combinefilterdict=combinefilterdict)
         if verbose:
