@@ -5,12 +5,17 @@ __author__ = 'douglasquincyadams'
 # sndrizzle --filters F160W  --doall --mjdmin 56010 --mjdmax 56300 --ra 189.156538 --dec 62.309147  --refcat 'goodsn_mosaic.cat' colfax
 
 import os
+import os
 import sys
 import astroquery
 import astroquery.mast
+from sndrizpipe.runpipe_cmdline import runpipe
+
+
+
 sys.path.insert(1, '../datafindhubble')
 
-
+import Library_StringFileNameStripLastExtension
 import Library_SystemDirectoryCreateSafe
 import Library_DataFindBarbaraMikulskiArchiveProductsHubbleSingleObject
 import Library_PrettyPrintNestedObject
@@ -132,14 +137,11 @@ print (TestCommand)
 
 print ("Trying to run the test command, without opening a shell.")
 print ("Instead we will call the `sndrizpipe.runpipe_cmdline.runpipe` command")
-from sndrizpipe.runpipe_cmdline import runpipe
-import Library_StringFileNameStripLastExtension
-
 
 RunPipeArgumentDirectory = Library_StringFileNameStripLastExtension.Main(SymlinkDirectory)
 print ('RunPipeArgumentDirectory', RunPipeArgumentDirectory)
 
-import os
+
 
 CurrentDirectory = os.getcwd()
 
@@ -166,38 +168,6 @@ runpipe(
 
 #Change back to the original directory after the pipe call is done
 os.chdir( CurrentDirectory )
-"""
-runpipe(outroot, onlyfilters=[], onlyepochs=[],
-            # combine together multiple bands
-            combinefilterdict={'method': None}, # Run all the processing steps
-            doall=False, # Setup : copy flts into sub-directories
-            dosetup=False, epochlistfile=None, # construct a ref image
-            dorefim=False, # Single Visit tweakreg/drizzle pass :
-            dodriz1=False, drizcr=1, intravisitreg=False,
-            # Register to a given image or  epoch, visit and filter
-            doreg=False, singlestar=False, refim=None, refepoch=None,
-            refvisit=None, reffilter=None,
-            # Drizzle registered flts by epoch and filter
-            dodriz2=False, singlesci=False, # make diff images
-            dodiff=False, tempepoch=0, tempfilters=None, singlesubs=False,
-            # make multi-epoch stack images
-            dostack=False, # source detection and matching
-            interactive=False, threshold=5, nbright=None, peakmin=None,
-            peakmax=None,  # fluxmin=None, fluxmax=None,
-            searchrad=1.5, minobj=10, mjdmin=0, mjdmax=0, epochspan=5,
-            refcat=None, rfluxmax=None, rfluxmin=None, refnbright=None,
-            nclip=3, sigmaclip=3.0, drizcrsnr='5,4.5', shiftonly=False,
-            ra=None, dec=None, rot=0, imsize_arcsec=None, naxis12=None,
-            pixscale=None, pixfrac=None, wht_type='IVM', stackepochs=None,
-            stacktemplate=False, stackpixscale=None, stackpixfrac=None,
-            clean=False, clobber=False, verbose=True, debug=False):
-"""
-
-
-
-
-
-
 
 
 
