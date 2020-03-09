@@ -8,23 +8,29 @@ __author__ = 'srodney'
 
 print ('starting, and unzipping the tgz file')
 import os
-#colfaxtest()
-tgzfile = os.path.realpath( './colfax_test.tgz' )
-print ('tgzfile', tgzfile)
-os.system( 'tar -xvzf %s'%tgzfile )
 
+import sys
+sys.path.insert(1, '.')
 
-
-import runpipe_cmdline
+import sndrizpipe
+import sndrizpipe.runpipe_cmdline
 import urllib.request, urllib.error, urllib.parse
 import os
 import sys
 import time
 #from sndrizpipe.runpipe_cmdline import runpipe
 
+
+
+#colfaxtest()
+tgzfile = os.path.realpath( './colfax_test.tgz' )
+print ('tgzfile', tgzfile)
+os.system( 'tar -xvzf %s'%tgzfile )
+
 os.environ["iref"] = ""
 os.environ["jref"] = ""
-runpipe_cmdline.runpipe('colfax', doall=True, tempepoch=1)
+
+sndrizpipe.runpipe_cmdline.runpipe('colfax', doall=True, tempepoch=1)
 
 
 
