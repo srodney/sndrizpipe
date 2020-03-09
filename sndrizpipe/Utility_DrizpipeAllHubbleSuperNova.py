@@ -1,7 +1,9 @@
 
 print ('starting drizpipe imports...')
 #from sndrizpipe.runpipe_cmdline import runpipe
-import runpipe_cmdline
+#import runpipe_cmdline
+import sndrizpipe
+import sndrizpipe.runpipe_cmdline
 print('begining regular imports...')
 
 
@@ -178,7 +180,7 @@ for SymlinkDirectory, SymlinkDirectoryId, ra, dec, mjdmin, mjdmax in zip(Symlink
     os.environ["jref"] = ""
 
 
-    runpipe_cmdline.runpipe(
+    sndrizpipe.runpipe_cmdline.runpipe(
         RunPipeArgumentDirectory, 
         ra = ra,
         dec = dec, 
