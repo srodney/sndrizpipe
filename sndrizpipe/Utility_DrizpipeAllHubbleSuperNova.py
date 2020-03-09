@@ -1,6 +1,7 @@
 
-print ('starting pip imports...')
-from sndrizpipe.runpipe_cmdline import runpipe
+print ('starting drizpipe imports...')
+#from sndrizpipe.runpipe_cmdline import runpipe
+import runpipe_cmdline
 print('begining regular imports...')
 
 
@@ -41,6 +42,8 @@ import Library_DataFindBarbaraMikulskiArchiveProductsHubbleSingleObject
 import Library_PrettyPrintNestedObject
 import Library_BarbaraMikulskiArchiveSymlinkGroupMastDownloadDirectoryFiles
 import Library_StringFileNameStripLastExtension
+import Library_BarbaraMikulskiArchiveSearchProductListMetaData
+import Library_ComponentExtract
 print ('finished importing crap')
 
 #-------------------------------------------------------------------------------
@@ -122,34 +125,48 @@ for FolderName in SuperNovaHubbleImageDirectories:
     SymlinkDirectoryId = ResultSymlinkDirectory.split('/')[-2]
     SymlinkDirectoryIds.append(SymlinkDirectoryId)
 
-    #Find the relevant row in the catalog:
+    #Find the relevant object in the meta data:
+    FoundObjects = []
     for MetaDataFileName in MetaDataFileNames:
         MetaDataFilePath = os.path.realpath( SuperNovaMetaDataDirectory + '/' + MetaDataFileName )
-        print ('MetaDataFilePath', MetaDataFilePath)
-        with open(MetaDataFilePath) as filehandle:
-            MetaDataObject = json.load(filehandle)
-        for ForSingleSuperNova in MetaDataObject:
-            print ('ForSingleSuperNova')
-            print (ForSingleSuperNova)
-            if ForSingleSuperNova['ID'] == SymlinkDirectoryId:
-                ra = ForSingleSuperNova['ra']
-                dec = ForSingleSuperNova['dec']
-                mjdmin = ForSingleSuperNova['mjd_range'][0]
-                mjdmax =  ForSingleSuperNova['mjd_range'][1]
-                ras.append(ra)
-                decs.append(dec)
-                mjdmins.append(mjdmin)
-                mjdmaxs.append(mjdmax)
-                break
+        FoundObjects += Library_BarbaraMikulskiArchiveSearchProductListMetaData.Main(
+            ProductListMetaDataFilePath = MetaDataFilePath,
+            ConditionDictionary= {'ID': SymlinkDirectoryId }
+            )
+    SuperNovaObject = FoundObjects[0]
 
-print ('SymlinkDirectories', SymlinkDirectories)
-print ('SymlinkDirectoryIds', SymlinkDirectoryIds)
+    #Store the stuff we need for the drizpipe to run with
+    ra = SuperNovaObject['ra']
+    dec = SuperNovaObject['dec']
 
-"""
-for SymlinkDirectory, ra, dec, mjdmin, mjdmax in zip(SymlinkDirectories, ras, decs, mjdmins, mjdmaxs):
+    mjdrange = Library_ComponentExtract.Main(
+                Object          = SuperNovaObject,
+                Key             = 'mjd_range',
+                DefaultValue    = [None, None],  
+                )
+
+    mjdmin = mjdrange[0]
+    mjdmax = mjdrange[1]
+
+    ras.append(ra)
+    decs.append(dec)
+    mjdmins.append(mjdmin)
+    mjdmaxs.append(mjdmax)
+
+
+print ('\n\n\n')
+print('SymlinkDirectories', SymlinkDirectories )
+print('SymlinkDirectoryIds', SymlinkDirectoryIds )
+print('ras', ras )
+print('decs', decs )
+print('mjdmins', mjdmins )
+print('mjdmaxs', mjdmaxs )
+
+
+for SymlinkDirectory, SymlinkDirectoryId, ra, dec, mjdmin, mjdmax in zip(SymlinkDirectories, SymlinkDirectoryIds, ras, decs, mjdmins, mjdmaxs):
     RunPipeArgumentDirectory = Library_StringFileNameStripLastExtension.Main(SymlinkDirectory)
-    print ('RunPipeArgumentDirectory', RunPipeArgumentDirectory)
-
+    #print ('RunPipeArgumentDirectory', RunPipeArgumentDirectory)
+    print ('Doing full drizpipe on ', SymlinkDirectoryId)
 
     #Change to the directory one level up from the symlink directory, so exposure.py works:
     path = Path(SymlinkDirectory)
@@ -159,12 +176,14 @@ for SymlinkDirectory, ra, dec, mjdmin, mjdmax in zip(SymlinkDirectories, ras, de
     #Run the actual pipe command:
     os.environ["iref"] = ""
     os.environ["jref"] = ""
-    runpipe(
+
+
+    runpipe_cmdline.runpipe(
         RunPipeArgumentDirectory, 
-        ra = 150.468643,
-        dec = 2.164106, 
-        mjdmin = 52984.727,
-        mjdmax = 53134.727,
+        ra = ra,
+        dec = dec, 
+        mjdmin = mjdmin,
+        mjdmax = mjdmax,
         epochspan = 5,
         pixscale = 0.06,
         pixfrac = 0.8,
@@ -173,4 +192,29 @@ for SymlinkDirectory, ra, dec, mjdmin, mjdmax in zip(SymlinkDirectories, ras, de
 
     #Change back to the original directory after the pipe call is done
     os.chdir( CurrentDirectory )
-"""
+
+
+
+print ('completed.')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
