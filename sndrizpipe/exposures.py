@@ -136,14 +136,17 @@ def update_epochs( explist, fltlist, epochspan=5, mjdmin=0, mjdmax=0,
     return(explist)
 
 
-def read_explist(epochlistfile, outroot=None,
-                 combinefilterdict=None):
+def read_explist(
+    epochlistfile, 
+    outroot=None,
+    combinefilterdict=None):
     """Read the exposure list and epoch sorting scheme from epochlistfile,
     generating a new list of Exposures and return that explist.
     """
     import os
     if outroot is None :
         outroot = os.path.basename( epochlistfile ).split('_')[0]
+    print ('read_explist.outroot:', outroot)
     explist = []
     fin = open( epochlistfile )
     linelist = fin.readlines()
@@ -343,6 +346,9 @@ class Exposure( object ):
             self.orient = -1
 
         fltdir = outroot + '.flt'
+        print ('\n\n\n')
+        print ('fltdir:', fltdir)
+        print ('os.getcwd()', os.getcwd() )
         assert( os.path.isdir( fltdir ) )
 
         flcfile = os.path.join( fltdir, self.rootname+'_flc.fits')
