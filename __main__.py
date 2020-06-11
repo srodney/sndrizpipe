@@ -30,7 +30,7 @@ from sndrizpipe import exposures
 from sndrizpipe import drizzle
 from sndrizpipe import badpix
 from sndrizpipe import imarith
-from sndrizpipe import testpipe
+# from sndrizpipe import testpipe
 from astropy.io import fits as pyfits
 from drizzlepac.tweakback import tweakback
 from sndrizpipe import pseudodiff

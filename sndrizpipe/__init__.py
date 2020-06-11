@@ -12,7 +12,7 @@ from . import drizzle
 from . import badpix
 from . import register
 from . import imarith
-from . import testpipe
+#from . import testpipe
 from . import mkrefcat
 from . import pseudodiff
 from . import imcrop
