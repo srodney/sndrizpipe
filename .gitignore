@@ -4,6 +4,9 @@
 \#*\#
 commit.txt
 
+# Jupyter notebook cruft
+.ipynb*
+
 # executables (e.g. the UVIS CTE correction code)
 *.e
 

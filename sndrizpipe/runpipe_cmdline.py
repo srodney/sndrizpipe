@@ -505,7 +505,7 @@ def runpipe(outroot, onlyfilters=[], onlyepochs=[],
             # Run tweakback to update the constituent flts
             try:
                 tweakback(outsciFEV, input=fltlistFEV, origwcs=origwcs,
-                          wcsname=wcsname, verbose=verbose, force=clobber)
+                          wcsname=wcsname, newname=wcsname, verbose=verbose, force=clobber)
             except KeyError as e:
                 import pdb
                 pdb.set_trace()
@@ -1168,7 +1168,7 @@ def main():
 
     if argv.dotest:
         from sndrizpipe import testpipe
-        testpipe.colfaxtest(getflts=True, runpipeline=True)
+        testpipe.colfaxtest()#getflts=True, runpipeline=True)
         return 0
 
     ra, dec = None, None

@@ -7,6 +7,8 @@ from astropy.io import fits as pyfits
 from stsci import tools
 from drizzlepac import astrodrizzle
 import numpy as np
+from .util import extname_bug_cleanup, scrubnans
+
 
 def hotpixPostargClean(flt1, flt2, verbose=False):
     """
@@ -129,6 +131,8 @@ def firstDrizzle( fltlist, outroot, wcskey='', driz_cr=True, clean=True,
 
     scrubnans( outscifile )
     scrubnans( outwhtfile )
+    extname_bug_cleanup(outscifile)
+    extname_bug_cleanup(outwhtfile)
 
     if clean :
         ctxfile = outscifile.replace( '_sci.fits','_ctx.fits')
@@ -258,6 +262,9 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
 
     scrubnans( outscifile ) 
     scrubnans( outwhtfile )
+    extname_bug_cleanup(outscifile)
+    extname_bug_cleanup(outwhtfile)
+
 
     scilist = [ outscifile ]
     whtlist = [ outwhtfile ]
@@ -308,6 +315,11 @@ def secondDrizzle( fltlist='*fl?.fits', outroot='final', refimage='',
             if os.path.isfile( ctxfile ) :
                 os.remove( ctxfile )
 
+    for scifile in scilist:
+        extname_bug_cleanup(scifile)
+    for whtfile in whtlist:
+        extname_bug_cleanup(outwhtfile)
+
     return( scilist, whtlist, bpxlist )
 
 
@@ -357,19 +369,6 @@ def getdrizpar( instrument, detector, nexposures=None ) :
         raise RuntimeError('Unknown instrument+detector:  %s %s'%(instrument, detector ) )
 
 
-def scrubnans( filename, fillval=0 ):
-    """Locate any pixels in the given fits file that have values of NaN,
-    indef, or inf. Replace them all with the given fillval.
-    """
-    from numpy import where, isfinite
-
-    hdulist = pyfits.open( filename, mode='update' )
-    imdata = hdulist[0].data
-    ybad, xbad  = where( 1-isfinite( imdata ) )
-    imdata[ybad, xbad] = fillval
-    hdulist.flush()
-    hdulist.close()
-    return()
 
 if __name__ == '__main__':
 

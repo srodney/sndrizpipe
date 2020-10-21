@@ -6,6 +6,7 @@ from astropy.io import fits as pyfits
 from stsci import tools
 from drizzlepac import tweakreg
 import stwcs
+from .util import extname_bug_cleanup
 
 
 def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
@@ -166,6 +167,8 @@ def RunTweakReg(files='*fl?.fits', refcat=None, refim=None,
         xcol, ycol, fluxcol = 1,2,None
 
     print(( 'fitgeometry = %s'%fitgeometry ))
+
+    extname_bug_cleanup(files)  # clean up any buggy headers
     tweakreg.TweakReg(files, updatehdr=True, wcsname=wcsname,
                       use2dhist=use2dhist,
                       see2dplot=False, residplot='No plot',
