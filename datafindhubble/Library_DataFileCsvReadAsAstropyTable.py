@@ -42,6 +42,7 @@ RETURNS:
         Type:
         Description:
 """
+import numpy
 import pandas
 import astropy
 import astropy.table
@@ -53,9 +54,13 @@ def Main(
     ColumnNamesNew= None,
     ColumnNamesRestrict = None,
     ColumnValuesRestrict = None,
+    ResultFormat = None,
     CheckArguments = True,
     PrintExtra = False,
     ):
+
+    if ResultFormat is None:
+        ResultFormat = 'astropy'
 
     Result = None
 
@@ -73,7 +78,7 @@ def Main(
                 print("ArgumentErrorMessage:\n", ArgumentErrorMessage)
             raise Exception(ArgumentErrorMessage)
 
-    #Load table:
+    #Load table in astropy format regardless of header types:
     AstropyTableFull = None
     try:
         AstropyTableFull = astropy.io.ascii.read(Filepath)
@@ -92,6 +97,7 @@ def Main(
         print ('AstropyTableSubset.colnames')
         print (AstropyTableSubset.colnames)
 
+
     #Make a data object containing a list of the columns we want
     ColumnsWanted = []
     for ColumnNameExisting in ColumnNamesExisting:
@@ -101,13 +107,20 @@ def Main(
     if PrintExtra: 
         print ('ColumnsWanted', ColumnsWanted)
 
+
     #Use astropy to map the data in the columns to new names in a new table
     AstropyTableSubsetColumnMap = astropy.table.Table(
         ColumnsWanted,
         names=ColumnNamesNew
         )
+    if ResultFormat is 'astropy':
+        Result = AstropyTableSubsetColumnMap
+    elif ResultFormat is 'numpy':
+        ColumnNames = AstropyTableSubsetColumnMap.colnames
+        #Result = numpy.array(AstropyTableSubsetColumnMap).tolist()
+        #Result = numpy.array([*Result]).astype(numpy.float)
 
-    Result = AstropyTableSubsetColumnMap
+
     return Result 
 
 
