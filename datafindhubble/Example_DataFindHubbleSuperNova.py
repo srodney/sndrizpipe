@@ -35,6 +35,8 @@ import Library_PressTheAnyKey
 import Library_ComponentExtract
 import Library_DataFindBarbaraMikulskiArchiveProductsHubbleSingleObject
 import Library_NestedObjectNumpyElementsToLists
+import Library_SystemGetLocalDataDirectory
+
 #-------------------------------------------------------------------------------
 #Global settings for the run:
 warnings.simplefilter('ignore')
@@ -45,13 +47,7 @@ DownloadItemMaximum = 1000
 #-------------------------------------------------------------------------------
 #Directory Management:
 HomeDirectory = Library_SystemGetLocalHomeDirectory.Main()
-DataDirectory = HomeDirectory + '/DataHome'
-
-HostName = socket.gethostname()
-print ('HostName:', HostName)
-if HostName == 'login001':
-    DataDirectory = '/work/da2/DataHome'
-print ('DataDirectory:' , DataDirectory)
+DataDirectory = Library_SystemGetLocalDataDirectory.Main()
 
 SuperNovaCatalogsDataDirectory  = DataDirectory + '/AstronomySuperNovaData/SuperNovaCatalogs/'
 SuperNovaImageDownloadDirectory = DataDirectory + '/AstronomySuperNovaData/SuperNovaHubbleImages/'

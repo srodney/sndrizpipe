@@ -3,7 +3,8 @@ SOURCE:
     Mind of Douglas Adams
 DESCRIPTION:
     A product list is downloaded into a directory:
-        ProductListDownloadDirectory = \"/DataHome/AstronomySuperNovaData/SuperNovaHubbleImages/04D2al/mastDownload\"
+        ProductListDownloadDirectory = \"/AstronomySuperNovaData/SuperNovaHubbleImages/04D2al/mastDownload\"
+
     Astroquery creates subdirectories
         \"/mastDownload/HST/j8pu1cynq\"
         \"/mastDownload/HST/j8pu1cyrq\"
@@ -79,6 +80,7 @@ def Main(
 
 
     #Third create the list of symlinks in the "neighbor" directory
+    SymlinkFilePathExistsAlreadyCount = 0
     for FitsFilePath in FitsFilePaths:
         FitsFilePath = os.path.realpath(FitsFilePath)
         FitsFileName = Library_StringFilePathGetFileName.Main(FitsFilePath)
@@ -92,10 +94,14 @@ def Main(
             os.symlink(FitsFilePath, SymlinkFilePath  )
         #If the link already exists on the system - pass, and continue
         except FileExistsError:
-            print ('SymlinkFilePath exists already')
+            #print ('SymlinkFilePath exists already')
+            SymlinkFilePathExistsAlreadyCount += 1
         #If something else went wrong - raise the expection as normal
         except:
             raise
+
+    if SymlinkFilePathExistsAlreadyCount > 0:
+        print (SymlinkFilePathExistsAlreadyCount, 'Symlink File Paths Exist Already. Skipped Them.')
 
     Result = DownloadDirectoryNeighbor
     return Result 

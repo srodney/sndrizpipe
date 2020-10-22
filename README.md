@@ -11,11 +11,10 @@ Dependencies
 --------
 
 Requires drizzlepac from STScI.  Recommended installation method: use
-the Ureka package, which provides python, numpy, pyraf, drizzlepac,
-etc., with mutually compatible versions, bundled and maintained by
-STScI/Gemini.
+the AstroConda package, which provides python, numpy, pyraf, drizzlepac,
+etc., with mutually compatible versions.  Maintained by STScI.
    
-http://ssb.stsci.edu/ureka/
+https://astroconda.readthedocs.io/en/latest/
 
 ---------
 Environment variables
