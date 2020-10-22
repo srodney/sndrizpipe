@@ -980,7 +980,7 @@ def mkparser():
     parser.add_argument('--debug', action='store_true',
                         help='Enter debug mode. [False]', default=False)
     parser.add_argument('--dotest', action='store_true',
-                        help='Process the SN Colfax test data (all other'
+                        help='Process the SN Stone test data (all other'
                              'options ignored)', default=False)
 
     parser.add_argument('--singlestar', action='store_true',
@@ -1168,7 +1168,7 @@ def main():
 
     if argv.dotest:
         from sndrizpipe import testpipe
-        testpipe.colfaxtest()#getflts=True, runpipeline=True)
+        testpipe.doalltest()
         return 0
 
     ra, dec = None, None
